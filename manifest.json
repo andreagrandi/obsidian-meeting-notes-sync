@@ -1,0 +1,10 @@
+{
+	"id": "macparakeet-sync",
+	"name": "MacParakeet Sync",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Unofficial community plugin that syncs MacParakeet meeting transcripts, notes, and AI summaries into your vault.",
+	"author": "Andrea Grandi",
+	"authorUrl": "https://github.com/andreagrandi/obsidian-macparakeet-sync",
+	"isDesktopOnly": true
+}
