@@ -83,6 +83,23 @@ The plugin never reads MacParakeet's database. It only talks to `macparakeet-cli
 
 CI (GitHub Actions) runs build + tests on every push and PR.
 
+### Releasing
+
+Releases are cut by pushing a semver tag. `npm version` bumps the version in
+`package.json`, mirrors it into `manifest.json`, and records the
+`version -> minAppVersion` pair in `versions.json` (via `version-bump.mjs`):
+
+    npm version patch    # or: minor / major
+    git push && git push --tags
+
+Pushing the tag (e.g. `0.2.0`) triggers `.github/workflows/release.yml`, which
+builds and creates a GitHub release with `main.js`, `manifest.json`, and
+`versions.json` attached — the assets BRAT and manual installs need.
+
+Community-store submission (a PR adding the plugin to `community-plugins.json`
+in [`obsidianmd/obsidian-releases`](https://github.com/obsidianmd/obsidian-releases))
+is a one-time manual step done by the maintainer after the first release.
+
 ## License
 
 [MIT](LICENSE)
