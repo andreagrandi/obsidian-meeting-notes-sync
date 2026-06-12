@@ -141,3 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Obsidian plugin build artifacts (shipped only as GitHub release assets)
+main.js
+*.js.map
