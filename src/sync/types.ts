@@ -91,3 +91,8 @@ export interface SyncSummary {
 	updated: number;
 	unchanged: number;
 }
+
+export interface SyncOptions {
+	/** Re-render and overwrite every in-scope meeting, ignoring the cheap diff. */
+	force?: boolean;
+}

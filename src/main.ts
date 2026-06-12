@@ -1,10 +1,12 @@
 import { Notice, Plugin, TFile, TFolder, normalizePath } from "obsidian";
 import { existsSync } from "node:fs";
-import { CliBridge, CliError, nodeCommandRunner } from "./cli";
-import { SyncEngine } from "./sync";
-import { normalizeData } from "./sync";
-import type { PluginData, Settings, SyncOptions, SyncSummary, VaultIO } from "./sync";
+import { CliBridge, nodeCommandRunner } from "./cli";
+import { SyncEngine, SyncRunner, describeError, normalizeData } from "./sync";
+import type { PluginData, Settings, SyncOptions, VaultIO } from "./sync";
 import { MacParakeetSettingTab } from "./settings-tab";
+
+/** Delay after layout-ready before the on-launch sync, so startup is never slowed. */
+const LAUNCH_DELAY_MS = 15_000;
 
 /** Result of validating the CLI path, surfaced in the settings tab. */
 export interface CliStatus {
@@ -17,7 +19,10 @@ export interface CliStatus {
 export default class MacParakeetSyncPlugin extends Plugin {
 	private cli!: CliBridge;
 	private engine!: SyncEngine;
+	private runner!: SyncRunner;
 	private data!: PluginData;
+	private intervalId: number | null = null;
+	private launchTimeoutId: number | null = null;
 
 	async onload(): Promise<void> {
 		this.data = normalizeData(await this.loadData(), todayDate());
@@ -37,6 +42,19 @@ export default class MacParakeetSyncPlugin extends Plugin {
 			persist: () => this.saveData(this.data),
 		});
 
+		this.runner = new SyncRunner({
+			sync: (options) => this.engine.sync(options),
+			notify: (message) => {
+				new Notice(message);
+			},
+			log: (message) => console.log(message),
+			logError: (message, error) => console.error(message, error),
+		});
+
+		this.addRibbonIcon("refresh-cw", "Sync MacParakeet meetings", () => {
+			void this.runner.run("manual");
+		});
+
 		this.addCommand({
 			id: "check-connection",
 			name: "Check connection",
@@ -49,7 +67,7 @@ export default class MacParakeetSyncPlugin extends Plugin {
 			id: "sync-now",
 			name: "Sync now",
 			callback: () => {
-				void this.syncNow();
+				void this.runner.run("manual");
 			},
 		});
 
@@ -57,15 +75,23 @@ export default class MacParakeetSyncPlugin extends Plugin {
 			id: "force-resync",
 			name: "Force re-sync",
 			callback: () => {
-				void this.syncNow({ force: true });
+				void this.runner.run("manual", { force: true });
 			},
 		});
 
 		this.addSettingTab(new MacParakeetSettingTab(this.app, this));
+
+		this.applySchedule();
+		this.scheduleLaunchSync();
 	}
 
 	onunload(): void {
-		// Commands registered via addCommand are unregistered automatically on unload.
+		if (this.intervalId !== null) {
+			window.clearInterval(this.intervalId);
+		}
+		if (this.launchTimeoutId !== null) {
+			window.clearTimeout(this.launchTimeoutId);
+		}
 	}
 
 	/** Current settings; the engine and settings tab read these live. */
@@ -75,8 +101,12 @@ export default class MacParakeetSyncPlugin extends Plugin {
 
 	/** Merge a settings patch and persist it; takes effect on the next sync. */
 	async updateSettings(patch: Partial<Settings>): Promise<void> {
+		const previousInterval = this.data.settings.syncIntervalMinutes;
 		this.data.settings = { ...this.data.settings, ...patch };
 		await this.saveData(this.data);
+		if (this.data.settings.syncIntervalMinutes !== previousInterval) {
+			this.applySchedule();
+		}
 	}
 
 	/** Re-discover and validate the CLI from the current override; for the settings tab. */
@@ -86,8 +116,35 @@ export default class MacParakeetSyncPlugin extends Plugin {
 			const { cliPath, meetingCount } = await this.cli.checkConnection();
 			return { ok: true, path: cliPath, meetingCount };
 		} catch (error) {
-			return { ok: false, error: describeCliError(error) };
+			return { ok: false, error: describeError(error) };
 		}
+	}
+
+	/** (Re)start the background interval timer from the current setting; 0 disables. */
+	private applySchedule(): void {
+		if (this.intervalId !== null) {
+			window.clearInterval(this.intervalId);
+			this.intervalId = null;
+		}
+		const minutes = this.data.settings.syncIntervalMinutes;
+		if (minutes > 0) {
+			this.intervalId = window.setInterval(() => {
+				void this.runner.run("background");
+			}, minutes * 60_000);
+			this.registerInterval(this.intervalId);
+		}
+	}
+
+	/** Run a background sync ~15 s after layout is ready, if the toggle is on. */
+	private scheduleLaunchSync(): void {
+		this.app.workspace.onLayoutReady(() => {
+			this.launchTimeoutId = window.setTimeout(() => {
+				this.launchTimeoutId = null;
+				if (this.data.settings.syncOnLaunch) {
+					void this.runner.run("background");
+				}
+			}, LAUNCH_DELAY_MS);
+		});
 	}
 
 	private async checkConnection(): Promise<void> {
@@ -95,18 +152,8 @@ export default class MacParakeetSyncPlugin extends Plugin {
 			const { cliPath, meetingCount } = await this.cli.checkConnection();
 			new Notice(`MacParakeet Sync: connected.\nCLI: ${cliPath}\nMeetings: ${meetingCount}`);
 		} catch (error) {
-			new Notice(`MacParakeet Sync: ${describeCliError(error)}`);
+			new Notice(`MacParakeet Sync: ${describeError(error)}`);
 			console.error("MacParakeet Sync: check connection failed", error);
-		}
-	}
-
-	private async syncNow(options: SyncOptions = {}): Promise<void> {
-		try {
-			const summary = await this.engine.sync(options);
-			new Notice(`MacParakeet Sync: ${summarize(summary)}`);
-		} catch (error) {
-			new Notice(`MacParakeet Sync: ${describeCliError(error)}`);
-			console.error("MacParakeet Sync: sync failed", error);
 		}
 	}
 }
@@ -159,19 +206,6 @@ class ObsidianVaultIO implements VaultIO {
 		}
 		await this.vault.create(normalized, content);
 	}
-}
-
-/** A one-line sync result for the manual-sync Notice. */
-function summarize(summary: SyncSummary): string {
-	return `${summary.created} new, ${summary.updated} updated, ${summary.unchanged} unchanged`;
-}
-
-/** Turn a thrown error into a single actionable line for a Notice. */
-function describeCliError(error: unknown): string {
-	if (error instanceof CliError) {
-		return error.message;
-	}
-	return error instanceof Error ? error.message : String(error);
 }
 
 function messageOf(error: unknown): string {

@@ -11,6 +11,7 @@ import type {
 	CliClient,
 	MeetingRecord,
 	Settings,
+	SyncOptions,
 	SyncStateData,
 	SyncSummary,
 	VaultIO,
@@ -24,11 +25,6 @@ export interface SyncEngineDeps {
 	getSettings: () => Settings;
 	getState: () => SyncStateData;
 	persist: () => Promise<void>;
-}
-
-export interface SyncOptions {
-	/** Re-render and overwrite every in-scope meeting, ignoring the cheap diff. */
-	force?: boolean;
 }
 
 export class SyncEngine {

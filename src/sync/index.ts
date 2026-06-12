@@ -1,5 +1,5 @@
 export { SyncEngine, inScope, isUnchanged } from "./engine";
-export type { SyncEngineDeps, SyncOptions } from "./engine";
+export type { SyncEngineDeps } from "./engine";
 export {
 	bucketKey,
 	dateParts,
@@ -16,6 +16,8 @@ export {
 	renderResults,
 } from "./renderer";
 export type { RenderInput, RenderedFile } from "./renderer";
+export { SyncRunner, describeError, formatSummary } from "./runner";
+export type { SyncRunnerDeps, SyncTrigger } from "./runner";
 export { assignNumber, effectiveSyncSince, normalizeData } from "./state";
 export {
 	DEFAULT_SETTINGS,
@@ -27,6 +29,7 @@ export type {
 	MeetingRecord,
 	PluginData,
 	Settings,
+	SyncOptions,
 	SyncStateData,
 	SyncSummary,
 	VaultIO,
