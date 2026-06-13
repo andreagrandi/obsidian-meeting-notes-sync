@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AiResult, MeetingDetail, MeetingSummary } from "../cli/types";
+import { MacParakeetAdapter } from "../sources/macparakeet";
+import type { SourceAdapter, SourceMeeting } from "../sources/types";
 import { SyncEngine, inScope } from "./engine";
 import { DEFAULT_SETTINGS, type CliClient, type Settings, type SyncStateData, type VaultIO } from "./types";
 import { emptyState } from "./types";
@@ -89,14 +91,18 @@ class FakeCli implements CliClient {
 	}
 }
 
-function makeEngine(cli: CliClient, vault: VaultIO, state: SyncStateData, settings: Settings) {
+function makeEngine(sources: SourceAdapter[], vault: VaultIO, state: SyncStateData, settings: Settings) {
 	return new SyncEngine({
-		cli,
+		sources,
 		vault,
 		getSettings: () => settings,
 		getState: () => state,
 		persist: async () => {},
 	});
+}
+
+function makeMacParakeetEngine(cli: CliClient, vault: VaultIO, state: SyncStateData, settings: Settings) {
+	return makeEngine([new MacParakeetAdapter(cli)], vault, state, settings);
 }
 
 /** Default settings with a wide-open sync window so fixtures are in scope. */
@@ -116,7 +122,7 @@ describe("SyncEngine — new meeting", () => {
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 
-		const result = await makeEngine(cli, vault, state, settings()).sync();
+		const result = await makeMacParakeetEngine(cli, vault, state, settings()).sync();
 
 		expect(result).toEqual({ created: 1, updated: 0, unchanged: 0 });
 		expect(vault.folders.has(FOLDER)).toBe(true);
@@ -135,7 +141,7 @@ describe("SyncEngine — classification matrix", () => {
 		);
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
-		const engine = makeEngine(cli, vault, state, settings());
+		const engine = makeMacParakeetEngine(cli, vault, state, settings());
 		return { cli, vault, state, engine };
 	}
 
@@ -194,7 +200,7 @@ describe("SyncEngine — content toggles", () => {
 		);
 		const vault = new FakeVault();
 
-		await makeEngine(cli, vault, emptyState("2026-06-01"), settings({ syncTranscript: true })).sync();
+		await makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings({ syncTranscript: true })).sync();
 
 		expect(vault.files.has(`${FOLDER}/Notes.md`)).toBe(true);
 		expect(vault.files.has(`${FOLDER}/Transcript.md`)).toBe(true);
@@ -208,7 +214,7 @@ describe("SyncEngine — content toggles", () => {
 			{ "m-1": [] },
 		);
 		const vault = new FakeVault();
-		await makeEngine(cli, vault, emptyState("2026-06-01"), settings()).sync();
+		await makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings()).sync();
 		expect(vault.files.has(`${FOLDER}/Notes.md`)).toBe(false);
 	});
 
@@ -221,13 +227,7 @@ describe("SyncEngine — content toggles", () => {
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 		const liveSettings = settings({ syncTranscript: false });
-		const engine = new SyncEngine({
-			cli,
-			vault,
-			getSettings: () => liveSettings,
-			getState: () => state,
-			persist: async () => {},
-		});
+		const engine = makeMacParakeetEngine(cli, vault, state, liveSettings);
 
 		await engine.sync();
 		expect(vault.files.has(`${FOLDER}/Transcript.md`)).toBe(false);
@@ -257,7 +257,7 @@ describe("SyncEngine — file ownership", () => {
 		const vault = new FakeVault();
 		const foreign = `${FOLDER}/My thoughts.md`;
 		vault.files.set(foreign, "my private notes");
-		const engine = makeEngine(cli, vault, emptyState("2026-06-01"), settings());
+		const engine = makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings());
 
 		await engine.sync();
 		// A bumped meeting triggers a re-render; the foreign file is still untouched.
@@ -278,7 +278,7 @@ describe("SyncEngine — force re-sync", () => {
 			{ "m-1": [aiResult({ id: "r-1", content: "original" })] },
 		);
 		const vault = new FakeVault();
-		const engine = makeEngine(cli, vault, emptyState("2026-06-01"), settings());
+		const engine = makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings());
 
 		await engine.sync();
 		// Result content changes but updatedAt and count stay the same.
@@ -311,7 +311,7 @@ describe("SyncEngine — sync scope and numbering", () => {
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 
-		const result = await makeEngine(cli, vault, state, settings({ syncSince: "2026-06-01" })).sync();
+		const result = await makeMacParakeetEngine(cli, vault, state, settings({ syncSince: "2026-06-01" })).sync();
 
 		expect(result.created).toBe(1);
 		expect(Object.keys(state.meetings)).toEqual(["recent"]);
@@ -332,7 +332,7 @@ describe("SyncEngine — sync scope and numbering", () => {
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 
-		await makeEngine(cli, vault, state, settings()).sync();
+		await makeMacParakeetEngine(cli, vault, state, settings()).sync();
 
 		expect(state.meetings["a"]?.n).toBe(1);
 		expect(state.meetings["b"]?.n).toBe(2);
@@ -361,7 +361,7 @@ describe("SyncEngine — v1 upgrade", () => {
 			files: { index: { path: `${FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" } },
 		};
 
-		const result = await makeEngine(cli, vault, state, settings()).sync();
+		const result = await makeMacParakeetEngine(cli, vault, state, settings()).sync();
 
 		expect(result).toEqual({ created: 0, updated: 0, unchanged: 1 });
 		expect(vault.writeLog).toHaveLength(0);
@@ -384,7 +384,7 @@ describe("SyncEngine — v1 upgrade", () => {
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 
-		await makeEngine(cli, vault, state, settings()).sync();
+		await makeMacParakeetEngine(cli, vault, state, settings()).sync();
 
 		expect(state.meetings["m-1"]?.sources.macparakeet).toEqual({
 			id: "m-1",
@@ -397,9 +397,148 @@ describe("SyncEngine — v1 upgrade", () => {
 	});
 });
 
+describe("SyncEngine — cross-source identity resolution", () => {
+	function sourceMeeting(overrides: Partial<SourceMeeting> & { id: string }): SourceMeeting {
+		return {
+			title: "Weekly Standup",
+			status: "completed",
+			createdAt: "2026-06-12T10:00:00Z",
+			updatedAt: "2026-06-12T10:30:00Z",
+			durationMs: 2820000,
+			promptResultCount: 0,
+			...overrides,
+		};
+	}
+
+	class FakeSource implements SourceAdapter {
+		readonly source: "macparakeet" | "fellow";
+		public enabled = true;
+		public meetings: SourceMeeting[] = [];
+		public details: Record<string, MeetingDetail> = {};
+		public results: Record<string, AiResult[]> = {};
+		public showCount = 0;
+		public resultsCount = 0;
+
+		constructor(source: "macparakeet" | "fellow") {
+			this.source = source;
+		}
+
+		isEnabled(): boolean {
+			return this.enabled;
+		}
+
+		async listMeetings(): Promise<SourceMeeting[]> {
+			return this.meetings;
+		}
+
+		async showMeeting(id: string): Promise<MeetingDetail> {
+			this.showCount += 1;
+			const found = this.details[id];
+			if (!found) {
+				throw new Error(`no detail for ${id}`);
+			}
+			return found;
+		}
+
+		async listResults(id: string): Promise<AiResult[]> {
+			this.resultsCount += 1;
+			return this.results[id] ?? [];
+		}
+	}
+
+	it("merges a Fellow recap into an existing MacParakeet folder by interval overlap", async () => {
+		const macparakeet = new FakeSource("macparakeet");
+		macparakeet.meetings = [sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 })];
+		macparakeet.details = { "mp-1": detail({ id: "mp-1" }) };
+		macparakeet.results = { "mp-1": [aiResult({ id: "r-1", name: "Summary" })] };
+
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Weekly Standup",
+				createdAt: "2026-06-12T10:02:00Z",
+				durationMs: 2700000,
+				updatedAt: "2026-06-12T14:00:00Z",
+			}),
+		];
+		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Weekly Standup" }) };
+		fellow.results = { "fl-1": [aiResult({ id: "fr-1", name: "Summary" })] };
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+
+		await makeEngine([macparakeet, fellow], vault, state, settings()).sync();
+
+		// One record, two bindings.
+		expect(Object.keys(state.meetings)).toHaveLength(1);
+		const record = Object.values(state.meetings)[0]!;
+		expect(record.sources.macparakeet?.id).toBe("mp-1");
+		expect(record.sources.fellow?.id).toBe("fl-1");
+		expect(record.n).toBe(1);
+		expect(record.mergeConfidence).toBe("high");
+	});
+
+	it("keeps back-to-back meetings as separate records", async () => {
+		const macparakeet = new FakeSource("macparakeet");
+		macparakeet.meetings = [
+			sourceMeeting({ id: "mp-1", title: "Standup", createdAt: "2026-06-12T10:00:00Z", durationMs: 900_000 }),
+		];
+		macparakeet.details = { "mp-1": detail({ id: "mp-1", title: "Standup", durationMs: 900_000 }) };
+
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Standup",
+				createdAt: "2026-06-12T10:15:00Z",
+				durationMs: 900_000,
+			}),
+		];
+		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Standup", durationMs: 900_000 }) };
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+
+		await makeEngine([macparakeet, fellow], vault, state, settings()).sync();
+
+		expect(Object.keys(state.meetings)).toHaveLength(2);
+	});
+
+	it("marks a merge low-confidence when titles differ strongly", async () => {
+		const macparakeet = new FakeSource("macparakeet");
+		macparakeet.meetings = [
+			sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 }),
+		];
+		macparakeet.details = { "mp-1": detail({ id: "mp-1", title: "Weekly Standup" }) };
+		macparakeet.results = { "mp-1": [aiResult({ id: "r-1" })] };
+
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Q3 Roadmap Review",
+				createdAt: "2026-06-12T10:02:00Z",
+				durationMs: 2700000,
+				updatedAt: "2026-06-12T14:00:00Z",
+			}),
+		];
+		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Q3 Roadmap Review" }) };
+		fellow.results = { "fl-1": [aiResult({ id: "fr-1" })] };
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+
+		await makeEngine([macparakeet, fellow], vault, state, settings()).sync();
+
+		const record = Object.values(state.meetings)[0]!;
+		expect(record.mergeConfidence).toBe("low");
+	});
+});
+
 describe("inScope", () => {
 	it("keeps completed, on-or-after meetings sorted oldest first", () => {
-		const meetings: MeetingSummary[] = [
+		const meetings: SourceMeeting[] = [
 			summary({ id: "new", createdAt: "2026-06-12T00:00:00Z" }),
 			summary({ id: "old", createdAt: "2026-06-01T00:00:00Z" }),
 			summary({ id: "before", createdAt: "2026-05-01T00:00:00Z" }),
@@ -409,7 +548,7 @@ describe("inScope", () => {
 	});
 
 	it("compares against the calendar date, not the raw timestamp", () => {
-		const meetings: MeetingSummary[] = [
+		const meetings: SourceMeeting[] = [
 			summary({ id: "same-day-early", createdAt: "2026-06-01T02:00:00Z" }),
 			summary({ id: "day-before-late", createdAt: "2026-05-31T23:30:00Z" }),
 		];

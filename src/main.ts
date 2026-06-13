@@ -1,6 +1,7 @@
 import { Notice, Plugin, TFile, TFolder, normalizePath } from "obsidian";
 import { existsSync } from "node:fs";
 import { CliBridge, nodeCommandRunner } from "./cli";
+import { MacParakeetAdapter, FellowAdapter } from "./sources";
 import { SyncEngine, SyncRunner, describeError, normalizeData } from "./sync";
 import type { PluginData, Settings, SyncOptions, VaultIO } from "./sync";
 import { MeetingNotesSettingTab } from "./settings-tab";
@@ -35,7 +36,7 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 		});
 
 		this.engine = new SyncEngine({
-			cli: this.cli,
+			sources: [new MacParakeetAdapter(this.cli), new FellowAdapter()],
 			vault: new ObsidianVaultIO(this),
 			getSettings: () => this.data.settings,
 			getState: () => this.data.state,

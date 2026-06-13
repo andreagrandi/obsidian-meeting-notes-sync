@@ -19,6 +19,17 @@ export interface Settings {
 	/** Background interval in minutes; 0 disables. */
 	syncIntervalMinutes: number;
 	syncOnLaunch: boolean;
+	/** Per-source enablement. Disabled sources are inert. */
+	sourceMacparakeetEnabled: boolean;
+	sourceFellowEnabled: boolean;
+	/** Fellow workspace subdomain (no protocol, no .fellow.app). */
+	fellowSubdomain: string;
+	/** Fellow personal API key; stored plaintext in data.json. */
+	fellowApiKey: string;
+	/** Minimum overlap fraction (0-1) for cross-source merge. */
+	overlapThreshold: number;
+	/** Minimum overlap in minutes for cross-source merge. */
+	minimumOverlapMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -31,6 +42,12 @@ export const DEFAULT_SETTINGS: Settings = {
 	syncTranscript: false,
 	syncIntervalMinutes: 30,
 	syncOnLaunch: true,
+	sourceMacparakeetEnabled: true,
+	sourceFellowEnabled: false,
+	fellowSubdomain: "",
+	fellowApiKey: "",
+	overlapThreshold: 0.5,
+	minimumOverlapMinutes: 5,
 };
 
 /** A plugin-owned file: the only paths the plugin is ever allowed to write. */
@@ -72,6 +89,10 @@ export interface MeetingRecord {
 	bucket: string;
 	/** Canonical real-world interval; backfilled lazily for legacy records. */
 	interval?: Interval;
+	/** Best-known title for this meeting; used for cross-source tiebreaking. */
+	title?: string;
+	/** Confidence of the last cross-source merge; rendered to frontmatter in #29. */
+	mergeConfidence?: "high" | "low";
 	/** Per-source id + change snapshot; keyed by source name. */
 	sources: Partial<Record<SourceName, SourceBinding>>;
 	/**

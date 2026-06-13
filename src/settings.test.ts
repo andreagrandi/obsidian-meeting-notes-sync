@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { cleanBaseFolder, cleanInterval, isValidSyncSince, isValidTemplate } from "./settings";
+import {
+	cleanBaseFolder,
+	cleanInterval,
+	cleanMinimumOverlapMinutes,
+	cleanOverlapThreshold,
+	cleanSubdomain,
+	isValidSyncSince,
+	isValidTemplate,
+} from "./settings";
 
 describe("cleanBaseFolder", () => {
 	it("trims whitespace and strips leading/trailing slashes", () => {
@@ -45,6 +53,37 @@ describe("cleanInterval", () => {
 		expect(cleanInterval("-5")).toBe(0);
 		expect(cleanInterval("abc")).toBe(0);
 		expect(cleanInterval("")).toBe(0);
+	});
+});
+
+describe("cleanSubdomain", () => {
+	it("extracts the workspace slug", () => {
+		expect(cleanSubdomain("acme")).toBe("acme");
+		expect(cleanSubdomain("https://acme.fellow.app/")).toBe("acme");
+	});
+
+	it("strips invalid characters", () => {
+		expect(cleanSubdomain("acme inc!")).toBe("acmeinc");
+	});
+});
+
+describe("cleanOverlapThreshold", () => {
+	it("clamps values to 0-1", () => {
+		expect(cleanOverlapThreshold("0.5")).toBe(0.5);
+		expect(cleanOverlapThreshold("1.5")).toBe(1);
+		expect(cleanOverlapThreshold("-0.1")).toBe(0);
+	});
+
+	it("falls back to the default for non-numbers", () => {
+		expect(cleanOverlapThreshold("abc")).toBe(0.5);
+	});
+});
+
+describe("cleanMinimumOverlapMinutes", () => {
+	it("parses a non-negative whole number", () => {
+		expect(cleanMinimumOverlapMinutes("5")).toBe(5);
+		expect(cleanMinimumOverlapMinutes("5.9")).toBe(5);
+		expect(cleanMinimumOverlapMinutes("-1")).toBe(0);
 	});
 });
 

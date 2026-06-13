@@ -1,11 +1,20 @@
 import { type App, PluginSettingTab, Setting, debounce, normalizePath } from "obsidian";
 import type MeetingNotesSyncPlugin from "./main";
-import { cleanBaseFolder, cleanInterval, isValidSyncSince, isValidTemplate } from "./settings";
+import {
+	cleanBaseFolder,
+	cleanInterval,
+	cleanMinimumOverlapMinutes,
+	cleanOverlapThreshold,
+	cleanSubdomain,
+	isValidSyncSince,
+	isValidTemplate,
+} from "./settings";
 
 /** The full configuration UI; reads and writes the plugin's live settings. */
 export class MeetingNotesSettingTab extends PluginSettingTab {
 	private readonly plugin: MeetingNotesSyncPlugin;
 	private cliStatusEl: HTMLElement | null = null;
+	private fellowStatusEl: HTMLElement | null = null;
 
 	constructor(app: App, plugin: MeetingNotesSyncPlugin) {
 		super(app, plugin);
@@ -16,6 +25,17 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 		const settings = this.plugin.getSettings();
+
+		containerEl.createEl("h3", { text: "MacParakeet" });
+
+		new Setting(containerEl)
+			.setName("Enable MacParakeet source")
+			.setDesc("Import meetings from macparakeet-cli.")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.sourceMacparakeetEnabled).onChange((value) => {
+					void this.plugin.updateSettings({ sourceMacparakeetEnabled: value });
+				}),
+			);
 
 		new Setting(containerEl)
 			.setName("macparakeet-cli path")
@@ -40,6 +60,83 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 			);
 		this.cliStatusEl = containerEl.createEl("div", { cls: "setting-item-description" });
 		void this.refreshCliStatus();
+
+		containerEl.createEl("h3", { text: "Fellow" });
+
+		new Setting(containerEl)
+			.setName("Enable Fellow source")
+			.setDesc("Import AI recaps from Fellow. Requires a paid plan with the API enabled.")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.sourceFellowEnabled).onChange((value) => {
+					void this.plugin.updateSettings({ sourceFellowEnabled: value });
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Fellow workspace subdomain")
+			.setDesc("Your workspace slug (the 'acme' in acme.fellow.app).")
+			.addText((text) =>
+				text
+					.setPlaceholder("acme")
+					.setValue(settings.fellowSubdomain)
+					.onChange(
+						debounce(
+							async (value: string) => {
+								await this.plugin.updateSettings({ fellowSubdomain: cleanSubdomain(value) });
+								await this.refreshFellowStatus();
+							},
+							600,
+							true,
+						),
+					),
+			);
+
+		new Setting(containerEl)
+			.setName("Fellow API key")
+			.setDesc(
+				"Personal API key from User Settings → Developer Tools. Stored in plaintext in data.json — mind vault sync and git.",
+			)
+			.addText((text) => {
+				text.inputEl.type = "password";
+				text.setValue(settings.fellowApiKey).onChange(
+					debounce(
+						async (value: string) => {
+							await this.plugin.updateSettings({ fellowApiKey: value.trim() });
+							await this.refreshFellowStatus();
+						},
+						600,
+						true,
+					),
+				);
+			});
+
+		this.fellowStatusEl = containerEl.createEl("div", { cls: "setting-item-description" });
+		void this.refreshFellowStatus();
+
+		containerEl.createEl("h3", { text: "Merge" });
+
+		new Setting(containerEl)
+			.setName("Overlap threshold")
+			.setDesc("Minimum overlap as a fraction of the shorter meeting (0–1).")
+			.addText((text) => {
+				text.inputEl.type = "number";
+				text.inputEl.step = "0.05";
+				text.setValue(String(settings.overlapThreshold)).onChange((value) => {
+					void this.plugin.updateSettings({ overlapThreshold: cleanOverlapThreshold(value) });
+				});
+			});
+
+		new Setting(containerEl)
+			.setName("Minimum overlap (minutes)")
+			.setDesc("Absolute minimum overlap required before a merge is considered.")
+			.addText((text) => {
+				text.inputEl.type = "number";
+				text.setValue(String(settings.minimumOverlapMinutes)).onChange((value) => {
+					void this.plugin.updateSettings({ minimumOverlapMinutes: cleanMinimumOverlapMinutes(value) });
+				});
+			});
+
+		containerEl.createEl("h3", { text: "Vault layout" });
 
 		new Setting(containerEl)
 			.setName("Base folder")
@@ -81,6 +178,8 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 				});
 			});
 
+		containerEl.createEl("h3", { text: "Content" });
+
 		new Setting(containerEl)
 			.setName("Sync AI results")
 			.setDesc("Import each meeting's AI prompt results as separate notes.")
@@ -107,6 +206,8 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 					void this.plugin.updateSettings({ syncTranscript: value });
 				}),
 			);
+
+		containerEl.createEl("h3", { text: "Triggers" });
 
 		new Setting(containerEl)
 			.setName("Sync interval (minutes)")
@@ -143,5 +244,24 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 			el.addClass("mod-warning");
 			el.setText(`Not connected: ${status.error}`);
 		}
+	}
+
+	private async refreshFellowStatus(): Promise<void> {
+		const el = this.fellowStatusEl;
+		if (!el) {
+			return;
+		}
+		const settings = this.plugin.getSettings();
+		if (!settings.sourceFellowEnabled) {
+			el.setText("Fellow source is disabled.");
+			return;
+		}
+		if (!settings.fellowSubdomain || !settings.fellowApiKey) {
+			el.addClass("mod-warning");
+			el.setText("Enter subdomain and API key to connect.");
+			return;
+		}
+		el.removeClass("mod-warning");
+		el.setText("Fellow connection check will be implemented in issue #25.");
 	}
 }

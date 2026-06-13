@@ -40,6 +40,12 @@ function normalizeSettings(raw: unknown): Settings {
 		syncTranscript: asBool(obj.syncTranscript, DEFAULT_SETTINGS.syncTranscript),
 		syncIntervalMinutes: asNumber(obj.syncIntervalMinutes, DEFAULT_SETTINGS.syncIntervalMinutes),
 		syncOnLaunch: asBool(obj.syncOnLaunch, DEFAULT_SETTINGS.syncOnLaunch),
+		sourceMacparakeetEnabled: asBool(obj.sourceMacparakeetEnabled, DEFAULT_SETTINGS.sourceMacparakeetEnabled),
+		sourceFellowEnabled: asBool(obj.sourceFellowEnabled, DEFAULT_SETTINGS.sourceFellowEnabled),
+		fellowSubdomain: asString(obj.fellowSubdomain, DEFAULT_SETTINGS.fellowSubdomain),
+		fellowApiKey: asString(obj.fellowApiKey, DEFAULT_SETTINGS.fellowApiKey),
+		overlapThreshold: clampOverlap(asNumber(obj.overlapThreshold, DEFAULT_SETTINGS.overlapThreshold)),
+		minimumOverlapMinutes: clampMinutes(asNumber(obj.minimumOverlapMinutes, DEFAULT_SETTINGS.minimumOverlapMinutes)),
 	};
 }
 
@@ -82,9 +88,17 @@ function normalizeRecord(key: string, raw: unknown): MeetingRecord | undefined {
 			: { macparakeet: { id: key, snapshot: normalizeSnapshot(raw.snapshot) } },
 		files: isRecord(raw.files) ? (raw.files as Record<string, FileRecord>) : {},
 	};
+	const title = asString(raw.title, "");
+	if (title) {
+		record.title = title;
+	}
 	const interval = normalizeInterval(raw.interval);
 	if (interval) {
 		record.interval = interval;
+	}
+	const mergeConfidence = asString(raw.mergeConfidence, "");
+	if (mergeConfidence === "high" || mergeConfidence === "low") {
+		record.mergeConfidence = mergeConfidence;
 	}
 	return record;
 }
@@ -184,4 +198,12 @@ function asBool(value: unknown, fallback: boolean): boolean {
 
 function asNumber(value: unknown, fallback: number): number {
 	return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function clampOverlap(value: number): number {
+	return Math.max(0, Math.min(1, value));
+}
+
+function clampMinutes(value: number): number {
+	return Math.max(0, Math.floor(value));
 }

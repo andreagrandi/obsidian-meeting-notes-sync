@@ -28,6 +28,28 @@ export function cleanInterval(input: string | number): number {
 	return Math.floor(value);
 }
 
+/** Normalize a Fellow subdomain: trim, drop protocol/host, fall back to empty. */
+export function cleanSubdomain(input: string): string {
+	let value = input.trim().toLowerCase();
+	value = value.replace(/^https?:\/\//, "");
+	value = value.replace(/\.fellow\.app(\/.*)?$/, "");
+	return value.replace(/[^a-z0-9-]/g, "");
+}
+
+/** Coerce an overlap threshold to a number between 0 and 1. */
+export function cleanOverlapThreshold(input: string | number): number {
+	const value = typeof input === "number" ? input : Number.parseFloat(input);
+	if (!Number.isFinite(value)) {
+		return DEFAULT_SETTINGS.overlapThreshold;
+	}
+	return Math.max(0, Math.min(1, value));
+}
+
+/** Coerce a minimum-overlap-minutes field to a non-negative whole number. */
+export function cleanMinimumOverlapMinutes(input: string | number): number {
+	return cleanInterval(input);
+}
+
 /** A sync-since value is valid when blank (= install date) or a YYYY-MM-DD date. */
 export function isValidSyncSince(input: string): boolean {
 	const value = input.trim();

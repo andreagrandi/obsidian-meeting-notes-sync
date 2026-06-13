@@ -1,4 +1,4 @@
-export { SyncEngine, inScope, isUnchanged } from "./engine";
+export { SyncEngine, inScope, isSourceUnchanged } from "./engine";
 export type { SyncEngineDeps } from "./engine";
 export {
 	bucketKey,
@@ -27,6 +27,12 @@ export {
 	normalizeData,
 	sourceIndexKey,
 } from "./state";
+export {
+	resolveIdentity,
+	normalizedTitle,
+	normalizedTitleSimilarity,
+} from "./identity";
+export type { IdentityResolution, ResolvableMeeting } from "./identity";
 export {
 	DEFAULT_SETTINGS,
 	emptyState,
