@@ -43,11 +43,21 @@ export class SyncRunner {
 		this.running = true;
 		try {
 			const summary = await this.deps.sync(options);
-			this.handleSuccess(trigger, summary);
+			this.report(trigger, summary);
 		} catch (error) {
 			this.handleError(trigger, error);
 		} finally {
 			this.running = false;
+		}
+	}
+
+	/** Route a completed run to the clean-success or partial-failure handler. */
+	private report(trigger: SyncTrigger, summary: SyncSummary): void {
+		const errors = summary.errors ?? [];
+		if (errors.length === 0) {
+			this.handleSuccess(trigger, summary);
+		} else {
+			this.handleSourceErrors(trigger, summary, errors);
 		}
 	}
 
@@ -58,8 +68,31 @@ export class SyncRunner {
 		} else {
 			this.deps.log(message);
 		}
-		// A success clears the streak so the next failure notices again.
+		// A clean run clears the streak so the next failure notices again.
 		this.backgroundFailureStreak = 0;
+	}
+
+	/**
+	 * A source failed but the run finished (other sources may have synced). Report
+	 * it like an error: manual always, background once per failure streak.
+	 */
+	private handleSourceErrors(
+		trigger: SyncTrigger,
+		summary: SyncSummary,
+		errors: NonNullable<SyncSummary["errors"]>,
+	): void {
+		const detail = errors.map((entry) => `${entry.source} failed: ${entry.message}`).join("; ");
+		const message = `Meeting Notes Sync: ${formatSummary(summary)} — ${detail}`;
+		if (trigger === "manual") {
+			this.deps.notify(message);
+			this.deps.logError("Meeting Notes Sync: a source failed during manual sync", errors);
+			return;
+		}
+		this.deps.logError("Meeting Notes Sync: a source failed during background sync", errors);
+		this.backgroundFailureStreak += 1;
+		if (this.backgroundFailureStreak === 1) {
+			this.deps.notify(message);
+		}
 	}
 
 	private handleError(trigger: SyncTrigger, error: unknown): void {

@@ -13,6 +13,7 @@ import type {
 	MeetingRecord,
 	Settings,
 	SyncOptions,
+	SyncSourceError,
 	SyncStateData,
 	SyncSummary,
 	VaultIO,
@@ -47,6 +48,7 @@ export class SyncEngine {
 	async sync(options: SyncOptions = {}): Promise<SyncSummary> {
 		const force = options.force ?? false;
 		const summary: SyncSummary = { created: 0, updated: 0, unchanged: 0 };
+		const errors: SyncSourceError[] = [];
 		const settings = this.getSettings();
 
 		for (const source of this.sources) {
@@ -59,10 +61,16 @@ export class SyncEngine {
 					tally(summary, await this.processMeeting(source, meeting, force));
 				}
 			} catch (error) {
+				// One source failing must not abort the others; record it for the
+				// caller to surface as a single Notice (PLAN §12.5).
 				console.error(`Meeting Notes Sync: source ${source.source} failed`, error);
+				errors.push({ source: source.source, message: messageOf(error) });
 			}
 		}
 
+		if (errors.length > 0) {
+			summary.errors = errors;
+		}
 		await this.persist();
 		return summary;
 	}
@@ -213,4 +221,8 @@ function tally(summary: SyncSummary, outcome: Outcome): void {
 	} else {
 		summary.unchanged += 1;
 	}
+}
+
+function messageOf(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

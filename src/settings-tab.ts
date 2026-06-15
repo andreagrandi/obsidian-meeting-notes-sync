@@ -253,6 +253,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		}
 		const settings = this.plugin.getSettings();
 		if (!settings.sourceFellowEnabled) {
+			el.removeClass("mod-warning");
 			el.setText("Fellow source is disabled.");
 			return;
 		}
@@ -262,6 +263,14 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 			return;
 		}
 		el.removeClass("mod-warning");
-		el.setText("Fellow connection check will be implemented in issue #25.");
+		el.setText("Checking Fellow…");
+		const status = await this.plugin.validateFellow();
+		if (status.ok) {
+			el.removeClass("mod-warning");
+			el.setText(`Connected · ${status.workspace}`);
+		} else {
+			el.addClass("mod-warning");
+			el.setText(`Not connected: ${status.error}`);
+		}
 	}
 }

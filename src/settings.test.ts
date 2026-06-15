@@ -62,8 +62,21 @@ describe("cleanSubdomain", () => {
 		expect(cleanSubdomain("https://acme.fellow.app/")).toBe("acme");
 	});
 
+	it("lowercases and trims", () => {
+		expect(cleanSubdomain("  ACME  ")).toBe("acme");
+	});
+
+	it("strips the host without a protocol and any trailing path", () => {
+		expect(cleanSubdomain("acme.fellow.app")).toBe("acme");
+		expect(cleanSubdomain("http://acme.fellow.app/api/v1/me")).toBe("acme");
+	});
+
 	it("strips invalid characters", () => {
 		expect(cleanSubdomain("acme inc!")).toBe("acmeinc");
+	});
+
+	it("returns an empty string for blank input", () => {
+		expect(cleanSubdomain("   ")).toBe("");
 	});
 });
 

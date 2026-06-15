@@ -137,11 +137,19 @@ export interface VaultIO {
 	write(path: string, content: string): Promise<void>;
 }
 
+/** A source that failed during a run without aborting the other sources. */
+export interface SyncSourceError {
+	source: SourceName;
+	message: string;
+}
+
 /** What one sync run reports back to the caller. */
 export interface SyncSummary {
 	created: number;
 	updated: number;
 	unchanged: number;
+	/** Per-source failures that did not abort the run; omitted when the run was clean. */
+	errors?: SyncSourceError[];
 }
 
 export interface SyncOptions {

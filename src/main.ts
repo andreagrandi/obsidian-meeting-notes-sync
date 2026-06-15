@@ -18,6 +18,13 @@ export interface CliStatus {
 	error?: string;
 }
 
+/** Result of the Fellow connection check (`GET /me`), surfaced in the settings tab. */
+export interface FellowStatus {
+	ok: boolean;
+	workspace?: string;
+	error?: string;
+}
+
 export default class MeetingNotesSyncPlugin extends Plugin {
 	private cli!: CliBridge;
 	private fellow!: FellowClient;
@@ -129,6 +136,16 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 		try {
 			const { cliPath, meetingCount } = await this.cli.checkConnection();
 			return { ok: true, path: cliPath, meetingCount };
+		} catch (error) {
+			return { ok: false, error: describeError(error) };
+		}
+	}
+
+	/** Validate the Fellow key against `GET /me`; for the settings tab health check. */
+	async validateFellow(): Promise<FellowStatus> {
+		try {
+			const me = await this.fellow.me();
+			return { ok: true, workspace: me.workspace.name };
 		} catch (error) {
 			return { ok: false, error: describeError(error) };
 		}

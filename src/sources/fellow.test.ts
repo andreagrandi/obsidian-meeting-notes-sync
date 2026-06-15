@@ -188,4 +188,41 @@ describe("FellowAdapter — end to end through the engine", () => {
 		expect(counts.note).toBe(0);
 		expect(vault.files.has(`${FOLDER}/Notes.md`)).toBe(false);
 	});
+
+	it("reports a revoked/invalid key as a source error with no partial write", async () => {
+		const http: FellowHttp = async () => ({ status: 401, text: "" });
+		const vault = new FakeVault();
+
+		const result = await makeEngine(http, emptyState("2026-06-01"), settings(), vault).sync();
+
+		expect(result.created).toBe(0);
+		expect(result.errors).toHaveLength(1);
+		expect(result.errors?.[0]?.source).toBe("fellow");
+		expect(result.errors?.[0]?.message).toContain("401");
+		expect(vault.writeLog).toHaveLength(0);
+	});
+});
+
+describe("FellowAdapter.isEnabled", () => {
+	function adapter() {
+		const client = new FellowClient({ http: async () => json({}), getConfig: () => ({ subdomain: "", apiKey: "" }) });
+		return new FellowAdapter(client, () => settings());
+	}
+
+	it("is enabled only when the flag is on and both fields are set", () => {
+		expect(adapter().isEnabled(settings())).toBe(true);
+	});
+
+	it("is disabled when the API key is empty, even with the flag on", () => {
+		expect(adapter().isEnabled(settings({ fellowApiKey: "" }))).toBe(false);
+		expect(adapter().isEnabled(settings({ fellowApiKey: "   " }))).toBe(false);
+	});
+
+	it("is disabled when the subdomain is empty", () => {
+		expect(adapter().isEnabled(settings({ fellowSubdomain: "" }))).toBe(false);
+	});
+
+	it("is disabled when the flag is off", () => {
+		expect(adapter().isEnabled(settings({ sourceFellowEnabled: false }))).toBe(false);
+	});
 });
