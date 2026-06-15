@@ -16,6 +16,11 @@ describe("normalizeData", () => {
 		expect(data.state).toEqual(emptyState("2026-06-12"));
 	});
 
+	it("ships every source disabled by default (sources are opt-in)", () => {
+		expect(DEFAULT_SETTINGS.sourceMacparakeetEnabled).toBe(false);
+		expect(DEFAULT_SETTINGS.sourceFellowEnabled).toBe(false);
+	});
+
 	it("round-trips v2 state byte-for-byte (load -> normalize -> save -> load)", () => {
 		const original = {
 			settings: { ...DEFAULT_SETTINGS, baseFolder: "Notes", syncTranscript: true },

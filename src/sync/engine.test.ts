@@ -105,9 +105,9 @@ function makeMacParakeetEngine(cli: CliClient, vault: VaultIO, state: SyncStateD
 	return makeEngine([new MacParakeetAdapter(cli)], vault, state, settings);
 }
 
-/** Default settings with a wide-open sync window so fixtures are in scope. */
+/** Default settings with MacParakeet on and a wide-open sync window so fixtures are in scope. */
 function settings(overrides: Partial<Settings> = {}): Settings {
-	return { ...DEFAULT_SETTINGS, syncSince: "2000-01-01", ...overrides };
+	return { ...DEFAULT_SETTINGS, sourceMacparakeetEnabled: true, syncSince: "2000-01-01", ...overrides };
 }
 
 const FOLDER = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";

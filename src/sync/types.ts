@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	syncTranscript: false,
 	syncIntervalMinutes: 30,
 	syncOnLaunch: true,
-	sourceMacparakeetEnabled: true,
+	sourceMacparakeetEnabled: false,
 	sourceFellowEnabled: false,
 	fellowSubdomain: "",
 	fellowApiKey: "",

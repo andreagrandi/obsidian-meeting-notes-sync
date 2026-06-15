@@ -27,9 +27,9 @@ Meetings/2026/06 - June/2 - Weekly Standup - Jun 11th/
 
 Each source is toggled independently; a disabled source is completely inert — no requests, writes, or notices.
 
-### MacParakeet — local CLI, on by default
+### MacParakeet — local CLI, opt-in
 
-Reads meetings from `macparakeet-cli` (no network, no accounts, no database access). Requires macOS with [MacParakeet](https://macparakeet.com) installed (the CLI ships inside the app) or the standalone CLI (`brew install moona3k/tap/macparakeet-cli`), and Obsidian desktop. The plugin auto-detects the CLI (Homebrew paths, then the app bundle); override the path in settings if needed, and the health check confirms it.
+Reads meetings from `macparakeet-cli` (no network, no accounts, no database access). Requires macOS with [MacParakeet](https://macparakeet.com) installed (the CLI ships inside the app) or the standalone CLI (`brew install moona3k/tap/macparakeet-cli`), and Obsidian desktop. The plugin auto-detects the CLI (Homebrew paths, then the app bundle); override the path in settings if needed, and the health check confirms it. Enable it in *Settings → Meeting Notes Sync*.
 
 ### Fellow — REST API, opt-in
 
