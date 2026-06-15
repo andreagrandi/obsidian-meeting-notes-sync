@@ -55,6 +55,8 @@ export interface FileRecord {
 	path: string;
 	/** Source timestamp the file was last rendered from; drives mirror updates. */
 	sourceUpdatedAt: string;
+	/** Owning source; absent on legacy (v1) records, treated as macparakeet. */
+	source?: SourceName;
 }
 
 /** The meeting sources the plugin can ingest from. */

@@ -130,9 +130,9 @@ describe("FellowAdapter — end to end through the engine", () => {
 		expect(result).toEqual({ created: 1, updated: 0, unchanged: 0 });
 		expect(vault.folders.has(FOLDER)).toBe(true);
 		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup.md`)).toBe(true);
-		expect(vault.files.get(`${FOLDER}/Summary.md`)).toContain("We shipped the release.");
-		expect(vault.files.get(`${FOLDER}/Notes.md`)).toContain("Ship it.");
-		expect(vault.files.get(`${FOLDER}/Transcript.md`)).toContain("**Alex:** Let's begin.");
+		expect(vault.files.get(`${FOLDER}/Summary (Fellow).md`)).toContain("We shipped the release.");
+		expect(vault.files.get(`${FOLDER}/Notes (Fellow).md`)).toContain("Ship it.");
+		expect(vault.files.get(`${FOLDER}/Transcript (Fellow).md`)).toContain("**Alex:** Let's begin.");
 		// show + results share a single recording fetch.
 		expect(counts.recording).toBe(1);
 		expect(counts.note).toBe(1);
@@ -186,7 +186,7 @@ describe("FellowAdapter — end to end through the engine", () => {
 		await makeEngine(http, emptyState("2026-06-01"), settings({ syncNotes: false }), vault).sync();
 
 		expect(counts.note).toBe(0);
-		expect(vault.files.has(`${FOLDER}/Notes.md`)).toBe(false);
+		expect(vault.files.has(`${FOLDER}/Notes (Fellow).md`)).toBe(false);
 	});
 
 	it("reports a revoked/invalid key as a source error with no partial write", async () => {

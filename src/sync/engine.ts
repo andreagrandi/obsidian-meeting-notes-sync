@@ -6,7 +6,7 @@
 
 import type { SourceAdapter, SourceMeeting } from "../sources/types";
 import { joinPath, bucketKey, renderTemplate, dateParts } from "./paths";
-import { renderMeeting } from "./renderer";
+import { renderArtifacts, renderIndex } from "./renderer";
 import { assignNumber, effectiveSyncSince, intervalFromDuration } from "./state";
 import { resolveIdentity, type ResolvableMeeting } from "./identity";
 import type {
@@ -124,16 +124,15 @@ export class SyncEngine {
 			await this.vault.createFolder(folderPath);
 		}
 
-		const rendered = renderMeeting({
+		const artifacts = renderArtifacts({
+			source: source.source,
 			meeting: detail,
 			results,
-			n,
 			folderPath,
 			includeNotes: settings.syncNotes,
 			includeTranscript: settings.syncTranscript,
+			existingFiles: current.files,
 		});
-		const index = rendered.find((file) => file.key === "index");
-		const artifacts = rendered.filter((file) => file.key !== "index");
 
 		let wrote = 0;
 		for (const file of artifacts) {
@@ -145,25 +144,13 @@ export class SyncEngine {
 				existing.path !== file.path;
 			if (stale) {
 				await this.vault.write(file.path, file.content);
-				current.files[file.key] = { path: file.path, sourceUpdatedAt: file.sourceUpdatedAt };
+				current.files[file.key] = { path: file.path, sourceUpdatedAt: file.sourceUpdatedAt, source: file.source };
 				wrote += 1;
 			}
 		}
 
-		if (index) {
-			const existing = current.files.index;
-			const indexStale =
-				force ||
-				!existing ||
-				existing.sourceUpdatedAt !== index.sourceUpdatedAt ||
-				existing.path !== index.path;
-			if (isNew || wrote > 0 || indexStale) {
-				await this.vault.write(index.path, index.content);
-				current.files.index = { path: index.path, sourceUpdatedAt: index.sourceUpdatedAt };
-				wrote += 1;
-			}
-		}
-
+		// Update the binding/interval/title before rendering the index so it
+		// reflects every source bound to this record (including the one just synced).
 		current.sources[source.source] = {
 			id: meeting.id,
 			snapshot: { updatedAt: meeting.updatedAt, promptResultCount: meeting.promptResultCount },
@@ -175,6 +162,27 @@ export class SyncEngine {
 		if (resolution.mergeConfidence) {
 			current.mergeConfidence = resolution.mergeConfidence;
 		}
+
+		const index = renderIndex({
+			folderPath,
+			title: current.title,
+			interval: current.interval,
+			sources: current.sources,
+			files: current.files,
+			mergeConfidence: current.mergeConfidence,
+		});
+		const existingIndex = current.files.index;
+		const indexStale =
+			force ||
+			!existingIndex ||
+			existingIndex.sourceUpdatedAt !== index.sourceUpdatedAt ||
+			existingIndex.path !== index.path;
+		if (isNew || wrote > 0 || indexStale) {
+			await this.vault.write(index.path, index.content);
+			current.files.index = { path: index.path, sourceUpdatedAt: index.sourceUpdatedAt };
+			wrote += 1;
+		}
+
 		state.meetings[recordKey] = current;
 
 		if (isNew) {

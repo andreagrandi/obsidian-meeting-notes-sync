@@ -127,7 +127,7 @@ describe("SyncEngine — new meeting", () => {
 		expect(result).toEqual({ created: 1, updated: 0, unchanged: 0 });
 		expect(vault.folders.has(FOLDER)).toBe(true);
 		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup.md`)).toBe(true);
-		expect(vault.files.has(`${FOLDER}/Summary.md`)).toBe(true);
+		expect(vault.files.has(`${FOLDER}/Summary (MacParakeet).md`)).toBe(true);
 		expect(state.meetings["m-1"]?.n).toBe(1);
 	});
 });
@@ -185,9 +185,9 @@ describe("SyncEngine — classification matrix", () => {
 
 		expect(result).toEqual({ created: 0, updated: 1, unchanged: 0 });
 		expect(vault.writeLog.sort()).toEqual(
-			[`${FOLDER}/Action Items.md`, `${FOLDER}/1 - Weekly Standup.md`].sort(),
+			[`${FOLDER}/Action Items (MacParakeet).md`, `${FOLDER}/1 - Weekly Standup.md`].sort(),
 		);
-		expect(vault.files.get(`${FOLDER}/1 - Weekly Standup.md`)).toContain("[[Action Items]]");
+		expect(vault.files.get(`${FOLDER}/1 - Weekly Standup.md`)).toContain("[[Action Items (MacParakeet)]]");
 	});
 });
 
@@ -203,7 +203,7 @@ describe("SyncEngine — content toggles", () => {
 		await makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings({ syncTranscript: true })).sync();
 
 		expect(vault.files.has(`${FOLDER}/Notes.md`)).toBe(true);
-		expect(vault.files.has(`${FOLDER}/Transcript.md`)).toBe(true);
+		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(true);
 		expect(vault.files.get(`${FOLDER}/Notes.md`)).toContain("Remember the demo.");
 	});
 
@@ -230,20 +230,20 @@ describe("SyncEngine — content toggles", () => {
 		const engine = makeMacParakeetEngine(cli, vault, state, liveSettings);
 
 		await engine.sync();
-		expect(vault.files.has(`${FOLDER}/Transcript.md`)).toBe(false);
+		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(false);
 
 		// Toggle transcript on, but the meeting itself has not changed.
 		liveSettings.syncTranscript = true;
 		const result = await engine.sync();
 
 		expect(result).toEqual({ created: 0, updated: 0, unchanged: 1 });
-		expect(vault.files.has(`${FOLDER}/Transcript.md`)).toBe(false);
+		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(false);
 
 		// Once the meeting changes, the now-enabled transcript is written.
 		cli.meetings = [summary({ id: "m-1", updatedAt: "2026-06-12T12:00:00Z" })];
 		cli.details["m-1"] = detail({ id: "m-1", transcript: "Full transcript.", updatedAt: "2026-06-12T12:00:00Z" });
 		await engine.sync();
-		expect(vault.files.has(`${FOLDER}/Transcript.md`)).toBe(true);
+		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(true);
 	});
 });
 
@@ -286,11 +286,11 @@ describe("SyncEngine — force re-sync", () => {
 
 		const normal = await engine.sync();
 		expect(normal).toEqual({ created: 0, updated: 0, unchanged: 1 });
-		expect(vault.files.get(`${FOLDER}/Summary.md`)).toContain("original");
+		expect(vault.files.get(`${FOLDER}/Summary (MacParakeet).md`)).toContain("original");
 
 		const forced = await engine.sync({ force: true });
 		expect(forced).toEqual({ created: 0, updated: 1, unchanged: 0 });
-		expect(vault.files.get(`${FOLDER}/Summary.md`)).toContain("regenerated");
+		expect(vault.files.get(`${FOLDER}/Summary (MacParakeet).md`)).toContain("regenerated");
 	});
 });
 
@@ -395,6 +395,43 @@ describe("SyncEngine — v1 upgrade", () => {
 			end: "2026-06-12T10:47:00.000Z",
 		});
 	});
+
+	it("re-renders a changed legacy meeting without renaming its tracked v1 files", async () => {
+		const cli = new FakeCli(
+			[summary({ id: "m-1", promptResultCount: 2, updatedAt: "2026-06-12T12:00:00Z" })],
+			{ "m-1": detail({ id: "m-1", updatedAt: "2026-06-12T12:00:00Z" }) },
+			{
+				"m-1": [
+					aiResult({ id: "r-1", name: "Summary" }),
+					aiResult({ id: "r-2", name: "Action Items", createdAt: "2026-06-12T10:09:00Z" }),
+				],
+			},
+		);
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+		state.counters["2026/06"] = 2;
+		state.meetings["m-1"] = {
+			folderPath: FOLDER,
+			n: 1,
+			bucket: "2026/06",
+			interval: { start: "2026-06-12T10:00:00.000Z", end: "2026-06-12T10:47:00.000Z" },
+			sources: {
+				macparakeet: { id: "m-1", snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 } },
+			},
+			files: {
+				index: { path: `${FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" },
+				"result:r-1": { path: `${FOLDER}/Summary.md`, sourceUpdatedAt: "2026-06-12T10:05:00Z" },
+			},
+		};
+
+		await makeMacParakeetEngine(cli, vault, state, settings()).sync();
+
+		// The unchanged legacy result keeps its v1 name and is not rewritten or renamed;
+		// only the newly appeared result gets the v2 source suffix.
+		expect(state.meetings["m-1"]?.files["result:r-1"]?.path).toBe(`${FOLDER}/Summary.md`);
+		expect(vault.writeLog).not.toContain(`${FOLDER}/Summary (MacParakeet).md`);
+		expect(vault.files.has(`${FOLDER}/Action Items (MacParakeet).md`)).toBe(true);
+	});
 });
 
 describe("SyncEngine — cross-source identity resolution", () => {
@@ -477,6 +514,47 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		expect(record.sources.fellow?.id).toBe("fl-1");
 		expect(record.n).toBe(1);
 		expect(record.mergeConfidence).toBe("high");
+	});
+
+	it("writes both sources' artifacts into one folder with a combined index (PLAN §12.4)", async () => {
+		const macparakeet = new FakeSource("macparakeet");
+		macparakeet.meetings = [sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 })];
+		macparakeet.details = { "mp-1": detail({ id: "mp-1", transcript: "mp transcript" }) };
+		macparakeet.results = { "mp-1": [aiResult({ id: "r-1", name: "Summary" })] };
+
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Weekly Standup",
+				createdAt: "2026-06-12T10:02:00Z",
+				durationMs: 2700000,
+				updatedAt: "2026-06-12T14:00:00Z",
+			}),
+		];
+		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Weekly Standup", transcript: "fl transcript" }) };
+		fellow.results = { "fl-1": [aiResult({ id: "fr-1", name: "Summary" })] };
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+
+		await makeEngine([macparakeet, fellow], vault, state, settings({ syncTranscript: true })).sync();
+
+		const folder = "Meetings/2026/06 - June/1 - Weekly Standup";
+		// Both sources' artifacts live in the one frozen folder, attributed by suffix.
+		expect(vault.files.has(`${folder}/Summary (MacParakeet).md`)).toBe(true);
+		expect(vault.files.has(`${folder}/Transcript (MacParakeet).md`)).toBe(true);
+		expect(vault.files.has(`${folder}/Summary (Fellow).md`)).toBe(true);
+		expect(vault.files.has(`${folder}/Transcript (Fellow).md`)).toBe(true);
+		// No renumber: still one record, no second folder.
+		expect(Object.keys(state.meetings)).toHaveLength(1);
+
+		const index = vault.files.get(`${folder}/1 - Weekly Standup.md`) ?? "";
+		expect(index).toContain("macparakeet-id: mp-1");
+		expect(index).toContain("fellow-id: fl-1");
+		expect(index).toContain("## MacParakeet");
+		expect(index).toContain("## Fellow");
+		expect(index).toContain("[[Summary (Fellow)]]");
 	});
 
 	it("keeps back-to-back meetings as separate records", async () => {
