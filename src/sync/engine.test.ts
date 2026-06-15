@@ -557,6 +557,50 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		expect(index).toContain("[[Summary (Fellow)]]");
 	});
 
+	it("merges identically when Fellow syncs first and MacParakeet arrives later", async () => {
+		const macparakeet = new FakeSource("macparakeet");
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Weekly Standup",
+				createdAt: "2026-06-12T10:02:00Z",
+				durationMs: 2700000,
+				updatedAt: "2026-06-12T14:00:00Z",
+			}),
+		];
+		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Weekly Standup" }) };
+		fellow.results = { "fl-1": [aiResult({ id: "fr-1", name: "Summary" })] };
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+		const engine = makeEngine([macparakeet, fellow], vault, state, settings());
+
+		// Sync 1: only Fellow has the meeting — it freezes the folder.
+		await engine.sync();
+		const folder = "Meetings/2026/06 - June/1 - Weekly Standup";
+		expect(Object.keys(state.meetings)).toEqual(["fl-1"]);
+		expect(vault.files.has(`${folder}/Summary (Fellow).md`)).toBe(true);
+
+		// Sync 2: MacParakeet now reports the same meeting (overlapping interval).
+		macparakeet.meetings = [sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 })];
+		macparakeet.details = { "mp-1": detail({ id: "mp-1" }) };
+		macparakeet.results = { "mp-1": [aiResult({ id: "r-1", name: "Summary" })] };
+
+		await engine.sync();
+
+		// Still one record/folder; MacParakeet merged into the Fellow-frozen folder.
+		expect(Object.keys(state.meetings)).toEqual(["fl-1"]);
+		const record = state.meetings["fl-1"]!;
+		expect(record.sources.macparakeet?.id).toBe("mp-1");
+		expect(record.sources.fellow?.id).toBe("fl-1");
+		expect(vault.files.has(`${folder}/Summary (MacParakeet).md`)).toBe(true);
+		expect(vault.files.has(`${folder}/Summary (Fellow).md`)).toBe(true);
+		const index = vault.files.get(`${folder}/1 - Weekly Standup.md`) ?? "";
+		expect(index).toContain("macparakeet-id: mp-1");
+		expect(index).toContain("fellow-id: fl-1");
+	});
+
 	it("keeps back-to-back meetings as separate records", async () => {
 		const macparakeet = new FakeSource("macparakeet");
 		macparakeet.meetings = [
