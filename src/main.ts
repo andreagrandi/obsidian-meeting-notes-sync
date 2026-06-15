@@ -1,6 +1,7 @@
-import { Notice, Plugin, TFile, TFolder, normalizePath } from "obsidian";
+import { Notice, Plugin, TFile, TFolder, normalizePath, requestUrl } from "obsidian";
 import { existsSync } from "node:fs";
 import { CliBridge, nodeCommandRunner } from "./cli";
+import { FellowClient, type FellowHttp } from "./fellow";
 import { MacParakeetAdapter, FellowAdapter } from "./sources";
 import { SyncEngine, SyncRunner, describeError, normalizeData } from "./sync";
 import type { PluginData, Settings, SyncOptions, VaultIO } from "./sync";
@@ -17,8 +18,16 @@ export interface CliStatus {
 	error?: string;
 }
 
+/** Result of the Fellow connection check (`GET /me`), surfaced in the settings tab. */
+export interface FellowStatus {
+	ok: boolean;
+	workspace?: string;
+	error?: string;
+}
+
 export default class MeetingNotesSyncPlugin extends Plugin {
 	private cli!: CliBridge;
+	private fellow!: FellowClient;
 	private engine!: SyncEngine;
 	private runner!: SyncRunner;
 	private data!: PluginData;
@@ -35,8 +44,19 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 			overridePath: () => this.data.settings.cliPath.trim() || undefined,
 		});
 
+		this.fellow = new FellowClient({
+			http: obsidianFellowHttp,
+			getConfig: () => ({
+				subdomain: this.data.settings.fellowSubdomain,
+				apiKey: this.data.settings.fellowApiKey,
+			}),
+		});
+
 		this.engine = new SyncEngine({
-			sources: [new MacParakeetAdapter(this.cli), new FellowAdapter()],
+			sources: [
+				new MacParakeetAdapter(this.cli),
+				new FellowAdapter(this.fellow, () => this.data.settings),
+			],
 			vault: new ObsidianVaultIO(this),
 			getSettings: () => this.data.settings,
 			getState: () => this.data.state,
@@ -116,6 +136,16 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 		try {
 			const { cliPath, meetingCount } = await this.cli.checkConnection();
 			return { ok: true, path: cliPath, meetingCount };
+		} catch (error) {
+			return { ok: false, error: describeError(error) };
+		}
+	}
+
+	/** Validate the Fellow key against `GET /me`; for the settings tab health check. */
+	async validateFellow(): Promise<FellowStatus> {
+		try {
+			const me = await this.fellow.me();
+			return { ok: true, workspace: me.workspace.name };
 		} catch (error) {
 			return { ok: false, error: describeError(error) };
 		}
@@ -212,6 +242,22 @@ class ObsidianVaultIO implements VaultIO {
 function messageOf(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
+
+/**
+ * Fellow HTTP transport backed by Obsidian's `requestUrl` (no CORS, no
+ * child_process). `throw: false` keeps non-2xx responses so the client maps
+ * status codes itself.
+ */
+const obsidianFellowHttp: FellowHttp = async (request) => {
+	const response = await requestUrl({
+		url: request.url,
+		method: request.method,
+		headers: request.headers,
+		body: request.body,
+		throw: false,
+	});
+	return { status: response.status, text: response.text };
+};
 
 /** Today's date as YYYY-MM-DD, used as the default sync-since on first run. */
 function todayDate(): string {

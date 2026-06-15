@@ -150,7 +150,9 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		const templateError = containerEl.createEl("div", { cls: "setting-item-description mod-warning" });
 		new Setting(containerEl)
 			.setName("Path template")
-			.setDesc("Folder path per meeting. Tokens: {year} {month} {monthName} {day} {date} {n} {title}")
+			.setDesc(
+				"Folder path per meeting. Tokens: {year} {month} {monthName} {monthShort} {day} {dayOrdinal} {date} {n} {title}",
+			)
 			.addText((text) =>
 				text.setValue(settings.pathTemplate).onChange((value) => {
 					if (!isValidTemplate(value)) {
@@ -253,6 +255,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		}
 		const settings = this.plugin.getSettings();
 		if (!settings.sourceFellowEnabled) {
+			el.removeClass("mod-warning");
 			el.setText("Fellow source is disabled.");
 			return;
 		}
@@ -262,6 +265,14 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 			return;
 		}
 		el.removeClass("mod-warning");
-		el.setText("Fellow connection check will be implemented in issue #25.");
+		el.setText("Checking Fellow…");
+		const status = await this.plugin.validateFellow();
+		if (status.ok) {
+			el.removeClass("mod-warning");
+			el.setText(`Connected · ${status.workspace}`);
+		} else {
+			el.addClass("mod-warning");
+			el.setText(`Not connected: ${status.error}`);
+		}
 	}
 }

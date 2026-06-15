@@ -113,3 +113,38 @@ describe("SyncRunner — notice policy", () => {
 		expect(notify).toHaveBeenCalledTimes(2);
 	});
 });
+
+describe("SyncRunner — per-source errors", () => {
+	const FELLOW_FAILED: SyncSummary = {
+		created: 2,
+		updated: 0,
+		unchanged: 1,
+		errors: [{ source: "fellow", message: "Fellow rejected the API key (401)." }],
+	};
+
+	it("reports a source failure on a manual sync, with the counts and the message", async () => {
+		const { runner, notify, logError } = makeRunner(async () => FELLOW_FAILED);
+		await runner.run("manual");
+		expect(notify).toHaveBeenCalledWith(
+			"Meeting Notes Sync: 2 new, 0 updated, 1 unchanged — fellow failed: Fellow rejected the API key (401).",
+		);
+		expect(logError).toHaveBeenCalled();
+	});
+
+	it("notices a background source failure only once per streak", async () => {
+		let mode: "fail" | "ok" = "fail";
+		const { runner, notify, logError } = makeRunner(async () => (mode === "fail" ? FELLOW_FAILED : EMPTY));
+
+		await runner.run("background");
+		await runner.run("background");
+		expect(notify).toHaveBeenCalledTimes(1);
+		expect(logError).toHaveBeenCalledTimes(2);
+
+		// A clean run ends the streak so the next failure notices again.
+		mode = "ok";
+		await runner.run("background");
+		mode = "fail";
+		await runner.run("background");
+		expect(notify).toHaveBeenCalledTimes(2);
+	});
+});

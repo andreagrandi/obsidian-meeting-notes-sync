@@ -11,11 +11,11 @@ export {
 export type { DateParts } from "./paths";
 export {
 	formatDuration,
+	renderArtifacts,
 	renderFrontmatter,
-	renderMeeting,
-	renderResults,
+	renderIndex,
 } from "./renderer";
-export type { RenderInput, RenderedFile } from "./renderer";
+export type { RenderArtifactsInput, RenderIndexInput, RenderedFile } from "./renderer";
 export { SyncRunner, describeError, formatSummary } from "./runner";
 export type { SyncRunnerDeps, SyncTrigger } from "./runner";
 export {

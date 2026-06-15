@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bucketKey, dateParts, joinPath, renderTemplate, sanitizeTitle, uniqueName } from "./paths";
+import { bucketKey, dateParts, joinPath, monthShortName, ordinalDay, renderTemplate, sanitizeTitle, uniqueName } from "./paths";
 import { DEFAULT_SETTINGS } from "./types";
 
 describe("sanitizeTitle", () => {
@@ -83,13 +83,57 @@ describe("renderTemplate", () => {
 		expect(out).toBe("01");
 	});
 
-	it("renders the default template as a spaced, number-and-name shape", () => {
+	it("resolves the abbreviated month and ordinal day tokens", () => {
+		const out = renderTemplate(
+			"{monthShort} {dayOrdinal}",
+			{ createdAt: "2026-06-02T11:00:00Z", title: "X" },
+			1,
+		);
+		expect(out).toBe("Jun 2nd");
+	});
+
+	it("renders the default template with the date appended", () => {
 		const out = renderTemplate(
 			DEFAULT_SETTINGS.pathTemplate,
 			{ createdAt: "2026-06-09T12:01:00Z", title: "Core sync/discovery" },
 			1,
 		);
-		expect(out).toBe("Meetings/2026/06 - June/1 - Core sync-discovery");
+		expect(out).toBe("Meetings/2026/06 - June/1 - Core sync-discovery - Jun 9th");
+	});
+});
+
+describe("monthShortName", () => {
+	it("maps a zero-padded month to its abbreviation", () => {
+		expect(monthShortName("01")).toBe("Jan");
+		expect(monthShortName("06")).toBe("Jun");
+		expect(monthShortName("12")).toBe("Dec");
+	});
+
+	it("returns empty for an out-of-range month", () => {
+		expect(monthShortName("00")).toBe("");
+		expect(monthShortName("13")).toBe("");
+	});
+});
+
+describe("ordinalDay", () => {
+	it("uses st/nd/rd for 1/2/3 and th otherwise", () => {
+		expect(ordinalDay("01")).toBe("1st");
+		expect(ordinalDay("02")).toBe("2nd");
+		expect(ordinalDay("03")).toBe("3rd");
+		expect(ordinalDay("04")).toBe("4th");
+	});
+
+	it("uses th for the 11-13 teens regardless of last digit", () => {
+		expect(ordinalDay("11")).toBe("11th");
+		expect(ordinalDay("12")).toBe("12th");
+		expect(ordinalDay("13")).toBe("13th");
+	});
+
+	it("uses the last-digit rule for 21/22/23/31", () => {
+		expect(ordinalDay("21")).toBe("21st");
+		expect(ordinalDay("22")).toBe("22nd");
+		expect(ordinalDay("23")).toBe("23rd");
+		expect(ordinalDay("31")).toBe("31st");
 	});
 });
 

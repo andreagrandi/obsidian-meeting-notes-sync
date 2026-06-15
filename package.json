@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-meeting-notes-sync",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Sync meeting transcripts, notes, and AI summaries from MacParakeet and Fellow into your vault.",
 	"main": "main.js",
 	"type": "module",

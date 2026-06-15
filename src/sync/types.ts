@@ -35,7 +35,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
 	cliPath: "",
 	baseFolder: "",
-	pathTemplate: "Meetings/{year}/{month} - {monthName}/{n} - {title}",
+	pathTemplate: "Meetings/{year}/{month} - {monthName}/{n} - {title} - {monthShort} {dayOrdinal}",
 	syncSince: "",
 	syncResults: true,
 	syncNotes: true,
@@ -55,6 +55,8 @@ export interface FileRecord {
 	path: string;
 	/** Source timestamp the file was last rendered from; drives mirror updates. */
 	sourceUpdatedAt: string;
+	/** Owning source; absent on legacy (v1) records, treated as macparakeet. */
+	source?: SourceName;
 }
 
 /** The meeting sources the plugin can ingest from. */
@@ -137,11 +139,19 @@ export interface VaultIO {
 	write(path: string, content: string): Promise<void>;
 }
 
+/** A source that failed during a run without aborting the other sources. */
+export interface SyncSourceError {
+	source: SourceName;
+	message: string;
+}
+
 /** What one sync run reports back to the caller. */
 export interface SyncSummary {
 	created: number;
 	updated: number;
 	unchanged: number;
+	/** Per-source failures that did not abort the run; omitted when the run was clean. */
+	errors?: SyncSourceError[];
 }
 
 export interface SyncOptions {

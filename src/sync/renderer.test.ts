@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AiResult, MeetingDetail } from "../cli/types";
-import { formatDuration, renderFrontmatter, renderMeeting } from "./renderer";
+import { formatDuration, renderArtifacts, renderFrontmatter, renderIndex } from "./renderer";
+import type { FileRecord, Interval, SourceBinding, SourceName } from "./types";
 
 const MEETING: MeetingDetail = {
 	id: "550e8400-e29b-41d4-a716-446655440000",
@@ -13,6 +14,8 @@ const MEETING: MeetingDetail = {
 	transcript: "Hello there.",
 	userNotes: "",
 };
+
+const INTERVAL: Interval = { start: "2026-06-12T10:00:00.000Z", end: "2026-06-12T10:47:00.000Z" };
 
 function result(overrides: Partial<AiResult>): AiResult {
 	return {
@@ -27,83 +30,152 @@ function result(overrides: Partial<AiResult>): AiResult {
 	};
 }
 
-describe("renderMeeting", () => {
-	it("renders an index note and one file per result", () => {
-		const files = renderMeeting({
-			meeting: MEETING,
-			results: [result({ id: "a", name: "Summary", createdAt: "2026-06-12T10:05:00Z" })],
-			n: 2,
-			folderPath: "MacParakeet/Meetings/2026/06/2-Weekly Standup",
+function binding(id: string, updatedAt = MEETING.updatedAt): SourceBinding {
+	return { id, snapshot: { updatedAt, promptResultCount: 0 } };
+}
+
+/** Build a files map from rendered artifacts, the way the engine persists it. */
+function filesOf(...rendered: { key: string; path: string; source?: SourceName }[]): Record<string, FileRecord> {
+	const files: Record<string, FileRecord> = {};
+	for (const file of rendered) {
+		files[file.key] = { path: file.path, sourceUpdatedAt: "x", source: file.source };
+	}
+	return files;
+}
+
+describe("renderArtifacts — MacParakeet", () => {
+	it("suffixes new artifacts with the source and scopes their keys", () => {
+		const files = renderArtifacts({
+			source: "macparakeet",
+			meeting: { ...MEETING, userNotes: "remember the demo", transcript: "full transcript" },
+			results: [result({ id: "a", name: "Summary" })],
+			folderPath: "Meetings/1 - Weekly Standup",
+			includeNotes: true,
+			includeTranscript: true,
 		});
 
-		const index = files.find((file) => file.key === "index");
-		const summary = files.find((file) => file.key === "result:a");
-		expect(index?.path).toBe("MacParakeet/Meetings/2026/06/2-Weekly Standup/2-Weekly Standup.md");
-		expect(summary?.path).toBe("MacParakeet/Meetings/2026/06/2-Weekly Standup/Summary.md");
-		expect(index?.sourceUpdatedAt).toBe(MEETING.updatedAt);
-		expect(summary?.sourceUpdatedAt).toBe("2026-06-12T10:05:00Z");
+		const byKey = Object.fromEntries(files.map((f) => [f.key, f.path]));
+		expect(byKey["result:a"]).toBe("Meetings/1 - Weekly Standup/Summary (MacParakeet).md");
+		expect(byKey["transcript"]).toBe("Meetings/1 - Weekly Standup/Transcript (MacParakeet).md");
+		// Notes stays unsuffixed for MacParakeet (PLAN §12.4).
+		expect(byKey["notes"]).toBe("Meetings/1 - Weekly Standup/Notes.md");
+		expect(files.find((f) => f.key === "result:a")?.content).toContain("macparakeet-id: 550e8400-e29b-41d4-a716-446655440000");
 	});
 
-	it("puts meeting frontmatter and a sibling link in the index", () => {
-		const index = renderMeeting({
+	it("reuses a legacy tracked path instead of renaming it", () => {
+		const existingFiles = filesOf({ key: "result:a", path: "Meetings/1 - Weekly Standup/Summary.md", source: "macparakeet" });
+		const files = renderArtifacts({
+			source: "macparakeet",
 			meeting: MEETING,
 			results: [result({ id: "a", name: "Summary" })],
-			n: 2,
-			folderPath: "MacParakeet/M",
-		})[0];
+			folderPath: "Meetings/1 - Weekly Standup",
+			existingFiles,
+		});
+		expect(files.find((f) => f.key === "result:a")?.path).toBe("Meetings/1 - Weekly Standup/Summary.md");
+	});
+});
 
-		expect(index?.content).toContain("macparakeet-id: 550e8400-e29b-41d4-a716-446655440000");
-		expect(index?.content).toContain("type: meeting");
-		expect(index?.content).toContain("duration: 47m");
-		expect(index?.content).toContain("# Weekly Standup");
-		expect(index?.content).toContain("[[Summary]]");
+describe("renderArtifacts — Fellow", () => {
+	it("scopes keys under the source and suffixes every artifact, including notes", () => {
+		const files = renderArtifacts({
+			source: "fellow",
+			meeting: { ...MEETING, userNotes: "fellow notes", transcript: "fellow transcript" },
+			results: [result({ id: "f1", name: "Action Items" })],
+			folderPath: "Meetings/1 - Weekly Standup",
+			includeNotes: true,
+			includeTranscript: true,
+		});
+
+		const byKey = Object.fromEntries(files.map((f) => [f.key, f.path]));
+		expect(byKey["result:fellow:f1"]).toBe("Meetings/1 - Weekly Standup/Action Items (Fellow).md");
+		expect(byKey["transcript:fellow"]).toBe("Meetings/1 - Weekly Standup/Transcript (Fellow).md");
+		expect(byKey["notes:fellow"]).toBe("Meetings/1 - Weekly Standup/Notes (Fellow).md");
+		expect(files.find((f) => f.key === "result:fellow:f1")?.content).toContain("fellow-id: 550e8400-e29b-41d4-a716-446655440000");
+	});
+});
+
+describe("renderIndex — single source", () => {
+	it("renders flat links (no source header) and source-specific frontmatter", () => {
+		const summary = renderArtifacts({
+			source: "macparakeet",
+			meeting: MEETING,
+			results: [result({ id: "a", name: "Summary" })],
+			folderPath: "Meetings/1 - Weekly Standup",
+		});
+		const index = renderIndex({
+			folderPath: "Meetings/1 - Weekly Standup",
+			title: "Weekly Standup",
+			interval: INTERVAL,
+			sources: { macparakeet: binding("550e8400-e29b-41d4-a716-446655440000") },
+			files: filesOf(...summary),
+		});
+
+		expect(index.path).toBe("Meetings/1 - Weekly Standup/1 - Weekly Standup.md");
+		expect(index.content).toContain("type: meeting");
+		expect(index.content).toContain("macparakeet-id: 550e8400-e29b-41d4-a716-446655440000");
+		expect(index.content).toContain("duration: 47m");
+		expect(index.content).toContain("# Weekly Standup");
+		expect(index.content).toContain("[[Summary (MacParakeet)]]");
+		expect(index.content).not.toContain("## MacParakeet");
+		expect(index.content).not.toContain("fellow-id");
 	});
 
-	it("disambiguates two results sharing a prompt name with a shortID suffix", () => {
-		const files = renderMeeting({
-			meeting: MEETING,
+	it("emits an index with no links and no headers when there are no artifacts", () => {
+		const index = renderIndex({
+			folderPath: "M",
+			title: "Empty",
+			interval: INTERVAL,
+			sources: { macparakeet: binding("m-1") },
+			files: {},
+		});
+		expect(index.content).not.toContain("[[");
+		expect(index.content).not.toContain("##");
+	});
+});
+
+describe("renderIndex — merged meeting", () => {
+	it("groups artifacts per source, carries both ids and the interval, flags low confidence", () => {
+		const mp = renderArtifacts({
+			source: "macparakeet",
+			meeting: { ...MEETING, transcript: "mp transcript" },
+			results: [result({ id: "a", name: "Summary" })],
+			folderPath: "Meetings/4 - Weekly Standup",
+			includeTranscript: true,
+		});
+		const fellow = renderArtifacts({
+			source: "fellow",
+			meeting: { ...MEETING, id: "rec-1", transcript: "fl transcript" },
 			results: [
-				result({ id: "a", name: "Summary", shortID: "AAAA", createdAt: "2026-06-12T10:05:00Z" }),
-				result({ id: "b", name: "Summary", shortID: "BBBB", createdAt: "2026-06-12T10:06:00Z" }),
+				result({ id: "rec-1#0.0", name: "Summary", createdAt: "2026-06-12T14:00:00Z" }),
+				result({ id: "rec-1#0.1", name: "Action Items", createdAt: "2026-06-12T14:00:00Z" }),
 			],
-			n: 1,
-			folderPath: "M",
+			folderPath: "Meetings/4 - Weekly Standup",
+			includeTranscript: true,
 		});
 
-		const names = files
-			.filter((file) => file.key.startsWith("result:"))
-			.map((file) => file.path);
-		expect(names).toContain("M/Summary.md");
-		expect(names).toContain("M/Summary (BBBB).md");
-	});
-
-	it("names the index exactly after its folder, regardless of the template", () => {
-		// A folder name that a length cap or custom template would not reproduce
-		// from sanitizing `{n}-{title}` independently.
-		const folderPath = "Archive/2026-06-12 Quarterly Review and Planning Q3 (very long)";
-		const [index] = renderMeeting({ meeting: MEETING, results: [], n: 7, folderPath });
-		expect(index?.key).toBe("index");
-		expect(index?.path).toBe(`${folderPath}/2026-06-12 Quarterly Review and Planning Q3 (very long).md`);
-	});
-
-	it("emits only an index (with no links) when there are no results", () => {
-		const files = renderMeeting({ meeting: MEETING, results: [], n: 1, folderPath: "M" });
-		expect(files).toHaveLength(1);
-		expect(files[0]?.key).toBe("index");
-		expect(files[0]?.content).not.toContain("[[");
-	});
-
-	it("includes a result's content and result-id frontmatter", () => {
-		const files = renderMeeting({
-			meeting: MEETING,
-			results: [result({ id: "a", name: "Action Items", content: "- do x" })],
-			n: 1,
-			folderPath: "M",
+		const index = renderIndex({
+			folderPath: "Meetings/4 - Weekly Standup",
+			title: "Weekly Standup",
+			interval: INTERVAL,
+			sources: { macparakeet: binding("mp-1"), fellow: binding("rec-1", "2026-06-12T14:00:00Z") },
+			files: filesOf(...mp, ...fellow),
+			mergeConfidence: "low",
 		});
-		const action = files.find((file) => file.key === "result:a");
-		expect(action?.content).toContain("result-id: a");
-		expect(action?.content).toContain("# Action Items");
-		expect(action?.content).toContain("- do x");
+
+		expect(index.content).toContain("macparakeet-id: mp-1");
+		expect(index.content).toContain("fellow-id: rec-1");
+		expect(index.content).toContain('interval-start: "2026-06-12T10:00:00.000Z"');
+		expect(index.content).toContain("merge-confidence: low");
+		// Grouped per source, MacParakeet first.
+		expect(index.content).toContain("## MacParakeet");
+		expect(index.content).toContain("## Fellow");
+		expect(index.content.indexOf("## MacParakeet")).toBeLessThan(index.content.indexOf("## Fellow"));
+		expect(index.content).toContain("[[Summary (MacParakeet)]]");
+		expect(index.content).toContain("[[Transcript (MacParakeet)]]");
+		// Fellow results keep section order: Summary before Action Items.
+		expect(index.content).toContain("[[Summary (Fellow)]] · [[Action Items (Fellow)]]");
+		// Index mirrors the newest source snapshot.
+		expect(index.sourceUpdatedAt).toBe("2026-06-12T14:00:00Z");
 	});
 });
 
