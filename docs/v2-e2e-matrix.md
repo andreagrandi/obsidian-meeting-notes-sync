@@ -24,9 +24,16 @@ Run them with `npm test`.
 
 ## Real-data run (pending)
 
-These rows still need a hands-on pass on a real tagged build — the automated
-proxies cannot exercise the live Fellow API, real diarized transcripts, or a
-genuine v1 vault. Fill in the outcome (pass / issue link) per row once run.
+A first real-data pass is available without Obsidian via the live harness
+(`npx -y tsx scripts/fellow-live-test.mts`), which runs the real engine against
+the live Fellow API and local `macparakeet-cli` into a temp vault. A run on the
+`supertab` workspace exercised rows 1–5 and 8 against real data — including a
+genuine cross-source merge (flagged `merge-confidence: low` on differing titles)
+and a correct *non*-merge of two same-titled, non-overlapping sessions.
+
+These rows still need a hands-on pass in Obsidian on a real tagged build — the
+harness cannot exercise Obsidian's `requestUrl`, the real ObsidianVaultIO, or a
+genuine in-app v1 upgrade. Fill in the outcome (pass / issue link) per row once run.
 
 Prerequisites:
 

@@ -136,6 +136,20 @@ The plugin keeps each source behind a common adapter and a source-agnostic sync 
 
 CI (GitHub Actions) runs build + tests on every push and PR.
 
+### Live Fellow test (optional)
+
+A throwaway harness runs the real sync engine — your local `macparakeet-cli`
+plus the live Fellow API — into a temp vault, for verifying the Fellow
+integration against real data without touching your real vault:
+
+    cp .env.example .env    # then fill in FELLOW_SUBDOMAIN and FELLOW_API_KEY
+    npx -y tsx scripts/fellow-live-test.mts
+
+`FELLOW_SUBDOMAIN` / `FELLOW_API_KEY` are read from `.env` (gitignored) for this
+harness only. The plugin itself never reads the environment — end users
+configure the subdomain and key in the settings UI, which persists them to
+`data.json`.
+
 ### Releasing
 
 Releases are cut by pushing a semver tag. `npm version` bumps the version in
