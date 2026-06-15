@@ -119,7 +119,7 @@ function makeEngine(http: FellowHttp, state: SyncStateData, live: Settings, vaul
 	});
 }
 
-const FOLDER = "Meetings/2026/06 - June/1 - Weekly Standup";
+const FOLDER = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 11th";
 
 describe("FellowAdapter — end to end through the engine", () => {
 	it("imports a Fellow meeting into the vault layout", async () => {
@@ -129,7 +129,7 @@ describe("FellowAdapter — end to end through the engine", () => {
 
 		expect(result).toEqual({ created: 1, updated: 0, unchanged: 0 });
 		expect(vault.folders.has(FOLDER)).toBe(true);
-		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup.md`)).toBe(true);
+		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup - Jun 11th.md`)).toBe(true);
 		expect(vault.files.get(`${FOLDER}/Summary (Fellow).md`)).toContain("We shipped the release.");
 		expect(vault.files.get(`${FOLDER}/Notes (Fellow).md`)).toContain("Ship it.");
 		expect(vault.files.get(`${FOLDER}/Transcript (Fellow).md`)).toContain("**Alex:** Let's begin.");

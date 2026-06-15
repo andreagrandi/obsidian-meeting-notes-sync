@@ -105,7 +105,9 @@ Two advanced settings control when meetings from different sources are treated a
 
 ### Path template tokens
 
-`{year}` · `{month}` (zero-padded) · `{monthName}` · `{day}` · `{date}` (YYYY-MM-DD) · `{n}` (per-month number) · `{title}` (sanitized). Unknown tokens are left as-is.
+`{year}` · `{month}` (zero-padded) · `{monthName}` (June) · `{monthShort}` (Jun) · `{day}` (zero-padded) · `{dayOrdinal}` (2nd) · `{date}` (YYYY-MM-DD) · `{n}` (per-month number) · `{title}` (sanitized). Unknown tokens are left as-is.
+
+The default template ends with `- {monthShort} {dayOrdinal}` so each folder carries its date (e.g. `4 - Core sync-discovery - Jun 2nd`), which disambiguates recurring meetings that share a title.
 
 ### Commands
 

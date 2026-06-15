@@ -150,7 +150,9 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		const templateError = containerEl.createEl("div", { cls: "setting-item-description mod-warning" });
 		new Setting(containerEl)
 			.setName("Path template")
-			.setDesc("Folder path per meeting. Tokens: {year} {month} {monthName} {day} {date} {n} {title}")
+			.setDesc(
+				"Folder path per meeting. Tokens: {year} {month} {monthName} {monthShort} {day} {dayOrdinal} {date} {n} {title}",
+			)
 			.addText((text) =>
 				text.setValue(settings.pathTemplate).onChange((value) => {
 					if (!isValidTemplate(value)) {

@@ -22,6 +22,21 @@ const MONTH_NAMES = [
 	"December",
 ];
 
+const MONTH_SHORT_NAMES = [
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
+];
+
 /** Date components resolved from a meeting's ISO createdAt, in UTC. */
 export interface DateParts {
 	year: string;
@@ -60,6 +75,26 @@ export function bucketKey(createdAt: string): string {
 	return `${year}/${month}`;
 }
 
+/** Abbreviated month name (e.g. "06" -> "Jun"); empty for an out-of-range month. */
+export function monthShortName(month: string): string {
+	const index = Number.parseInt(month, 10) - 1;
+	return MONTH_SHORT_NAMES[index] ?? "";
+}
+
+/** Day with its English ordinal suffix (e.g. "02" -> "2nd", "21" -> "21st"). */
+export function ordinalDay(day: string): string {
+	const n = Number.parseInt(day, 10);
+	if (!Number.isFinite(n)) {
+		return "";
+	}
+	const mod100 = n % 100;
+	if (mod100 >= 11 && mod100 <= 13) {
+		return `${n}th`;
+	}
+	const suffix = n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
+	return `${n}${suffix}`;
+}
+
 /** Sanitize a title for use as a folder/file name (PLAN §7). */
 export function sanitizeTitle(raw: string): string {
 	let title = (raw ?? "").replace(INVALID_CHARS, "-").replace(/\s+/g, " ").trim();
@@ -93,7 +128,9 @@ export function renderTemplate(
 		year,
 		month,
 		monthName,
+		monthShort: monthShortName(month),
 		day,
+		dayOrdinal: ordinalDay(day),
 		date,
 		n: String(n),
 		title: sanitizeTitle(meeting.title),

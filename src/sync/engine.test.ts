@@ -110,7 +110,8 @@ function settings(overrides: Partial<Settings> = {}): Settings {
 	return { ...DEFAULT_SETTINGS, syncSince: "2000-01-01", ...overrides };
 }
 
-const FOLDER = "Meetings/2026/06 - June/1 - Weekly Standup";
+const FOLDER = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
+const LEGACY_FOLDER = "Meetings/2026/06 - June/1 - Weekly Standup";
 
 describe("SyncEngine — new meeting", () => {
 	it("creates the folder, index, and result files", async () => {
@@ -126,7 +127,7 @@ describe("SyncEngine — new meeting", () => {
 
 		expect(result).toEqual({ created: 1, updated: 0, unchanged: 0 });
 		expect(vault.folders.has(FOLDER)).toBe(true);
-		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup.md`)).toBe(true);
+		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup - Jun 12th.md`)).toBe(true);
 		expect(vault.files.has(`${FOLDER}/Summary (MacParakeet).md`)).toBe(true);
 		expect(state.meetings["m-1"]?.n).toBe(1);
 	});
@@ -185,9 +186,9 @@ describe("SyncEngine — classification matrix", () => {
 
 		expect(result).toEqual({ created: 0, updated: 1, unchanged: 0 });
 		expect(vault.writeLog.sort()).toEqual(
-			[`${FOLDER}/Action Items (MacParakeet).md`, `${FOLDER}/1 - Weekly Standup.md`].sort(),
+			[`${FOLDER}/Action Items (MacParakeet).md`, `${FOLDER}/1 - Weekly Standup - Jun 12th.md`].sort(),
 		);
-		expect(vault.files.get(`${FOLDER}/1 - Weekly Standup.md`)).toContain("[[Action Items (MacParakeet)]]");
+		expect(vault.files.get(`${FOLDER}/1 - Weekly Standup - Jun 12th.md`)).toContain("[[Action Items (MacParakeet)]]");
 	});
 });
 
@@ -352,13 +353,13 @@ describe("SyncEngine — v1 upgrade", () => {
 		const state = emptyState("2026-06-01");
 		state.counters["2026/06"] = 2;
 		state.meetings["m-1"] = {
-			folderPath: FOLDER,
+			folderPath: LEGACY_FOLDER,
 			n: 1,
 			bucket: "2026/06",
 			sources: {
 				macparakeet: { id: "m-1", snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 } },
 			},
-			files: { index: { path: `${FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" } },
+			files: { index: { path: `${LEGACY_FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" } },
 		};
 
 		const result = await makeMacParakeetEngine(cli, vault, state, settings()).sync();
@@ -368,7 +369,7 @@ describe("SyncEngine — v1 upgrade", () => {
 		expect(cli.showCount).toBe(0);
 		// Numbering and folder are untouched; only the canonical interval is added.
 		expect(state.meetings["m-1"]?.n).toBe(1);
-		expect(state.meetings["m-1"]?.folderPath).toBe(FOLDER);
+		expect(state.meetings["m-1"]?.folderPath).toBe(LEGACY_FOLDER);
 		expect(state.meetings["m-1"]?.interval).toEqual({
 			start: "2026-06-12T10:00:00.000Z",
 			end: "2026-06-12T10:47:00.000Z",
@@ -411,7 +412,7 @@ describe("SyncEngine — v1 upgrade", () => {
 		const state = emptyState("2026-06-01");
 		state.counters["2026/06"] = 2;
 		state.meetings["m-1"] = {
-			folderPath: FOLDER,
+			folderPath: LEGACY_FOLDER,
 			n: 1,
 			bucket: "2026/06",
 			interval: { start: "2026-06-12T10:00:00.000Z", end: "2026-06-12T10:47:00.000Z" },
@@ -419,8 +420,8 @@ describe("SyncEngine — v1 upgrade", () => {
 				macparakeet: { id: "m-1", snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 } },
 			},
 			files: {
-				index: { path: `${FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" },
-				"result:r-1": { path: `${FOLDER}/Summary.md`, sourceUpdatedAt: "2026-06-12T10:05:00Z" },
+				index: { path: `${LEGACY_FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" },
+				"result:r-1": { path: `${LEGACY_FOLDER}/Summary.md`, sourceUpdatedAt: "2026-06-12T10:05:00Z" },
 			},
 		};
 
@@ -428,9 +429,9 @@ describe("SyncEngine — v1 upgrade", () => {
 
 		// The unchanged legacy result keeps its v1 name and is not rewritten or renamed;
 		// only the newly appeared result gets the v2 source suffix.
-		expect(state.meetings["m-1"]?.files["result:r-1"]?.path).toBe(`${FOLDER}/Summary.md`);
-		expect(vault.writeLog).not.toContain(`${FOLDER}/Summary (MacParakeet).md`);
-		expect(vault.files.has(`${FOLDER}/Action Items (MacParakeet).md`)).toBe(true);
+		expect(state.meetings["m-1"]?.files["result:r-1"]?.path).toBe(`${LEGACY_FOLDER}/Summary.md`);
+		expect(vault.writeLog).not.toContain(`${LEGACY_FOLDER}/Summary (MacParakeet).md`);
+		expect(vault.files.has(`${LEGACY_FOLDER}/Action Items (MacParakeet).md`)).toBe(true);
 	});
 });
 
@@ -540,7 +541,7 @@ describe("SyncEngine — cross-source identity resolution", () => {
 
 		await makeEngine([macparakeet, fellow], vault, state, settings({ syncTranscript: true })).sync();
 
-		const folder = "Meetings/2026/06 - June/1 - Weekly Standup";
+		const folder = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
 		// Both sources' artifacts live in the one frozen folder, attributed by suffix.
 		expect(vault.files.has(`${folder}/Summary (MacParakeet).md`)).toBe(true);
 		expect(vault.files.has(`${folder}/Transcript (MacParakeet).md`)).toBe(true);
@@ -549,7 +550,7 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		// No renumber: still one record, no second folder.
 		expect(Object.keys(state.meetings)).toHaveLength(1);
 
-		const index = vault.files.get(`${folder}/1 - Weekly Standup.md`) ?? "";
+		const index = vault.files.get(`${folder}/1 - Weekly Standup - Jun 12th.md`) ?? "";
 		expect(index).toContain("macparakeet-id: mp-1");
 		expect(index).toContain("fellow-id: fl-1");
 		expect(index).toContain("## MacParakeet");
@@ -578,7 +579,7 @@ describe("SyncEngine — cross-source identity resolution", () => {
 
 		// Sync 1: only Fellow has the meeting — it freezes the folder.
 		await engine.sync();
-		const folder = "Meetings/2026/06 - June/1 - Weekly Standup";
+		const folder = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
 		expect(Object.keys(state.meetings)).toEqual(["fl-1"]);
 		expect(vault.files.has(`${folder}/Summary (Fellow).md`)).toBe(true);
 
@@ -596,7 +597,7 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		expect(record.sources.fellow?.id).toBe("fl-1");
 		expect(vault.files.has(`${folder}/Summary (MacParakeet).md`)).toBe(true);
 		expect(vault.files.has(`${folder}/Summary (Fellow).md`)).toBe(true);
-		const index = vault.files.get(`${folder}/1 - Weekly Standup.md`) ?? "";
+		const index = vault.files.get(`${folder}/1 - Weekly Standup - Jun 12th.md`) ?? "";
 		expect(index).toContain("macparakeet-id: mp-1");
 		expect(index).toContain("fellow-id: fl-1");
 	});

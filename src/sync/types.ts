@@ -35,7 +35,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
 	cliPath: "",
 	baseFolder: "",
-	pathTemplate: "Meetings/{year}/{month} - {monthName}/{n} - {title}",
+	pathTemplate: "Meetings/{year}/{month} - {monthName}/{n} - {title} - {monthShort} {dayOrdinal}",
 	syncSince: "",
 	syncResults: true,
 	syncNotes: true,
