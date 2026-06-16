@@ -602,7 +602,7 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		expect(index).toContain("fellow-id: fl-1");
 	});
 
-	it("keeps back-to-back meetings as separate records", async () => {
+	it("merges back-to-back same-day same-title recordings across sources", async () => {
 		const macparakeet = new FakeSource("macparakeet");
 		macparakeet.meetings = [
 			sourceMeeting({ id: "mp-1", title: "Standup", createdAt: "2026-06-12T10:00:00Z", durationMs: 900_000 }),
@@ -625,7 +625,12 @@ describe("SyncEngine — cross-source identity resolution", () => {
 
 		await makeEngine([macparakeet, fellow], vault, state, settings()).sync();
 
-		expect(Object.keys(state.meetings)).toHaveLength(2);
+		// Same day + same title with no time overlap still merges (low confidence).
+		expect(Object.keys(state.meetings)).toHaveLength(1);
+		const record = Object.values(state.meetings)[0]!;
+		expect(record.sources.macparakeet?.id).toBe("mp-1");
+		expect(record.sources.fellow?.id).toBe("fl-1");
+		expect(record.mergeConfidence).toBe("low");
 	});
 
 	it("marks a merge low-confidence when titles differ strongly", async () => {

@@ -79,24 +79,36 @@ describe("resolveIdentity", () => {
 		expect(result.mergeConfidence).toBe("high");
 	});
 
-	it("does not merge when overlap is below the fraction threshold", () => {
+	it("does not merge a weak time overlap when titles differ", () => {
 		const state = emptyState("2026-06-01");
 		state.meetings["mp-1"] = macparakeetRecord("mp-1", "2026-06-12T10:00:00Z", 2_820_000);
 
-		// Overlaps only the first 3 minutes of a 47-minute meeting.
-		const m = meeting({ id: "fl-1", createdAt: "2026-06-12T09:50:00Z", durationMs: 780_000 });
+		// Overlaps only the first 3 minutes of a 47-minute meeting; a different
+		// title means the same-day fallback can't rescue it either.
+		const m = meeting({
+			id: "fl-1",
+			title: "Q3 Roadmap Review",
+			createdAt: "2026-06-12T09:50:00Z",
+			durationMs: 780_000,
+		});
 		const result = resolveIdentity(m, state, settings({ overlapThreshold: 0.5 }));
 
 		expect(result.recordKey).toBe("fl-1");
 		expect(result.existingRecord).toBeUndefined();
 	});
 
-	it("does not merge when overlap is below the minutes floor", () => {
+	it("does not merge below the minutes floor when titles differ", () => {
 		const state = emptyState("2026-06-01");
 		state.meetings["mp-1"] = macparakeetRecord("mp-1", "2026-06-12T10:00:00Z", 2_820_000);
 
-		// 100% overlap of a 2-minute meeting with a 47-minute meeting.
-		const m = meeting({ id: "fl-1", createdAt: "2026-06-12T10:00:00Z", durationMs: 120_000 });
+		// 100% overlap of a 2-minute meeting, but under the 5-minute floor; the
+		// differing title keeps the same-day fallback from merging it.
+		const m = meeting({
+			id: "fl-1",
+			title: "Q3 Roadmap Review",
+			createdAt: "2026-06-12T10:00:00Z",
+			durationMs: 120_000,
+		});
 		const result = resolveIdentity(m, state, settings({ minimumOverlapMinutes: 5 }));
 
 		expect(result.recordKey).toBe("fl-1");
@@ -123,15 +135,55 @@ describe("resolveIdentity", () => {
 		expect(result.existingRecord).toBeUndefined();
 	});
 
-	it("keeps back-to-back meetings separate", () => {
+	it("keeps same-title meetings on different days separate", () => {
 		const state = emptyState("2026-06-01");
 		state.meetings["mp-1"] = macparakeetRecord("mp-1", "2026-06-12T10:00:00Z", 900_000);
 
-		const m = meeting({ id: "fl-1", createdAt: "2026-06-12T10:15:00Z", durationMs: 900_000 });
+		// Same recurring title, but a week later — the same-day fallback must not
+		// collapse separate weekly instances.
+		const m = meeting({ id: "fl-1", createdAt: "2026-06-19T10:00:00Z", durationMs: 900_000 });
 		const result = resolveIdentity(m, state, settings());
 
 		expect(result.recordKey).toBe("fl-1");
 		expect(result.existingRecord).toBeUndefined();
+	});
+
+	it("merges same-day same-title recordings that do not overlap in time", () => {
+		// The reported bug: Fellow recorded 11:01–11:45, MacParakeet 11:45–12:30 —
+		// a 16-second gap, zero overlap, but plainly the same meeting.
+		const state = emptyState("2026-06-01");
+		state.meetings["mp-1"] = macparakeetRecord(
+			"mp-1",
+			"2026-06-16T11:45:26Z",
+			2_724_000,
+			"Core sync/discovery",
+		);
+
+		const m = meeting({
+			id: "fl-1",
+			title: "Core sync/discovery",
+			createdAt: "2026-06-16T11:01:44Z",
+			durationMs: 2_606_000,
+		});
+		const result = resolveIdentity(m, state, settings());
+
+		expect(result.recordKey).toBe("mp-1");
+		expect(result.existingRecord).toBe(state.meetings["mp-1"]);
+		expect(result.mergeConfidence).toBe("low");
+	});
+
+	it("prefers an overlapping record over a same-day title-only match", () => {
+		const state = emptyState("2026-06-01");
+		// Same day and title, but no time overlap (earlier in the day).
+		state.meetings["mp-early"] = macparakeetRecord("mp-early", "2026-06-12T08:00:00Z", 1_800_000);
+		// A record that actually overlaps the incoming meeting.
+		state.meetings["mp-overlap"] = macparakeetRecord("mp-overlap", "2026-06-12T10:00:00Z", 2_820_000);
+
+		const m = meeting({ id: "fl-1", createdAt: "2026-06-12T10:02:00Z", durationMs: 2_700_000 });
+		const result = resolveIdentity(m, state, settings());
+
+		expect(result.recordKey).toBe("mp-overlap");
+		expect(result.mergeConfidence).toBe("high");
 	});
 
 	it("merges late-start recordings that mostly overlap", () => {
