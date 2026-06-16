@@ -102,7 +102,7 @@ CI runs build + tests on every push and PR.
 
 **Live Fellow test** — `npx -y tsx scripts/fellow-live-test.mts` runs the real engine (local CLI + live Fellow API) into a temp vault. It reads `FELLOW_SUBDOMAIN` / `FELLOW_API_KEY` from `.env` (see `.env.example`) for the harness only; the plugin itself never reads the environment — end users configure the subdomain and key in the settings UI.
 
-**Releasing** — `npm version <patch|minor|major>` bumps `package.json`, `manifest.json`, and `versions.json` (via `version-bump.mjs`); pushing the tag triggers `.github/workflows/release.yml`, which attaches `main.js` + `manifest.json` + `versions.json` to a GitHub release. Community-store submission to [`obsidianmd/obsidian-releases`](https://github.com/obsidianmd/obsidian-releases) is a one-time manual step after the first release.
+**Releasing** — `npm run release <major.minor.patch>` (e.g. `npm run release 0.2.2`) bumps `package.json`, `manifest.json`, `versions.json`, and the lockfile, then commits and creates the unprefixed `X.Y.Z` tag. Push it (`git push origin master && git push origin <version>`) to trigger `.github/workflows/release.yml`, which attaches `main.js` + `manifest.json` + `versions.json` to a GitHub release. A plain `npm run` script is used (not the `npm version` lifecycle hook) so it works regardless of a global `ignore-scripts=true`. Community-store submission to [`obsidianmd/obsidian-releases`](https://github.com/obsidianmd/obsidian-releases) is a one-time manual step after the first release.
 
 ## License
 
