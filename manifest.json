@@ -5,6 +5,6 @@
 	"minAppVersion": "1.5.0",
 	"description": "Sync meeting transcripts, notes, and AI summaries from MacParakeet and Fellow into your vault.",
 	"author": "Andrea Grandi",
-	"authorUrl": "https://github.com/andreagrandi/obsidian-meeting-notes-sync",
+	"authorUrl": "https://github.com/andreagrandi",
 	"isDesktopOnly": true
 }
