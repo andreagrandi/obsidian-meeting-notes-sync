@@ -102,6 +102,15 @@ CI runs build + tests on every push and PR.
 
 **Releasing** — `npm run release <major.minor.patch>` (e.g. `npm run release 0.3.1`) bumps `package.json`, `manifest.json`, `versions.json`, and the lockfile, then commits and creates the unprefixed `X.Y.Z` tag. Push it (`git push origin master && git push origin <version>`) to trigger `.github/workflows/release.yml`, which attests `main.js`'s build provenance and attaches `main.js` + `manifest.json` to a GitHub release (Obsidian downloads only those two; `versions.json` is read from the repo). A plain `npm run` script is used (not the `npm version` lifecycle hook) so it works regardless of a global `ignore-scripts=true`. Community-store submission to [`obsidianmd/obsidian-releases`](https://github.com/obsidianmd/obsidian-releases) is a one-time manual step after the first release.
 
+## Permissions & system access
+
+Meeting Notes Sync is desktop-only (`isDesktopOnly: true`) because the MacParakeet source talks to a local command-line tool. Two capabilities surface as behavior warnings in Obsidian's plugin review, both scoped to locating and running `macparakeet-cli`:
+
+- **Shell execution (`child_process`)** — runs `macparakeet-cli` (`health`, `meetings list/show/results list --json`) to read your meetings locally; no network or database access. The Fellow source instead uses Obsidian's `requestUrl`.
+- **Filesystem access (`node:fs`)** — checks that the auto-discovered or configured CLI path exists before running it.
+
+The plugin writes meeting notes only through Obsidian's vault API. The MacParakeet source is opt-in (off by default); with it disabled, neither capability is exercised.
+
 ## License
 
 [MIT](LICENSE)
