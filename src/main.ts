@@ -68,7 +68,7 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 			notify: (message) => {
 				new Notice(message);
 			},
-			log: (message) => console.log(message),
+			log: () => {},
 			logError: (message, error) => console.error(message, error),
 		});
 
@@ -228,7 +228,7 @@ class ObsidianVaultIO implements VaultIO {
 		const normalized = normalizePath(path);
 		const existing = this.vault.getAbstractFileByPath(normalized);
 		if (existing instanceof TFile) {
-			await this.vault.modify(existing, content);
+			await this.vault.process(existing, () => content);
 			return;
 		}
 		const parent = normalized.slice(0, normalized.lastIndexOf("/"));

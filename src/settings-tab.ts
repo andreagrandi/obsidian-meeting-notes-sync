@@ -26,7 +26,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		const settings = this.plugin.getSettings();
 
-		containerEl.createEl("h3", { text: "MacParakeet" });
+		new Setting(containerEl).setName("MacParakeet").setHeading();
 
 		new Setting(containerEl)
 			.setName("Enable MacParakeet source")
@@ -61,7 +61,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		this.cliStatusEl = containerEl.createEl("div", { cls: "setting-item-description" });
 		void this.refreshCliStatus();
 
-		containerEl.createEl("h3", { text: "Fellow" });
+		new Setting(containerEl).setName("Fellow").setHeading();
 
 		new Setting(containerEl)
 			.setName("Enable Fellow source")
@@ -113,7 +113,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		this.fellowStatusEl = containerEl.createEl("div", { cls: "setting-item-description" });
 		void this.refreshFellowStatus();
 
-		containerEl.createEl("h3", { text: "Merge" });
+		new Setting(containerEl).setName("Merge").setHeading();
 
 		new Setting(containerEl)
 			.setName("Overlap threshold")
@@ -136,7 +136,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 				});
 			});
 
-		containerEl.createEl("h3", { text: "Vault layout" });
+		new Setting(containerEl).setName("Vault layout").setHeading();
 
 		new Setting(containerEl)
 			.setName("Base folder")
@@ -180,7 +180,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 				});
 			});
 
-		containerEl.createEl("h3", { text: "Content" });
+		new Setting(containerEl).setName("Content").setHeading();
 
 		new Setting(containerEl)
 			.setName("Sync AI results")
@@ -209,7 +209,7 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 				}),
 			);
 
-		containerEl.createEl("h3", { text: "Triggers" });
+		new Setting(containerEl).setName("Triggers").setHeading();
 
 		new Setting(containerEl)
 			.setName("Sync interval (minutes)")
