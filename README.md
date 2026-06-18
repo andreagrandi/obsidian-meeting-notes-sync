@@ -4,8 +4,6 @@
 
 Obsidian plugin that syncs your meeting transcripts, notes, and AI summaries into your vault — from [MacParakeet](https://macparakeet.com) and [Fellow](https://fellow.app), one folder per meeting. A meeting recorded by both sources merges into a single folder instead of duplicating.
 
-> **Status: beta** — releases are published on GitHub (install via [BRAT](#installation)); community-store submission is pending review. Full design in [PLAN.md](PLAN.md). Unofficial; not affiliated with MacParakeet or Fellow.
-
 ## What it does
 
 - **One folder per meeting**, with a folder-note index plus the meeting's artifacts. Each artifact is tagged by source (`Summary (MacParakeet).md`, `Summary (Fellow).md`), so a meeting captured by both stays unambiguous.
