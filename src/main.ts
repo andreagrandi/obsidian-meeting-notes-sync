@@ -4,7 +4,7 @@ import { CliBridge, nodeCommandRunner } from "./cli";
 import { FellowClient, type FellowHttp } from "./fellow";
 import { MacParakeetAdapter, FellowAdapter } from "./sources";
 import { SyncEngine, SyncRunner, describeError, normalizeData } from "./sync";
-import type { PluginData, Settings, SyncOptions, VaultIO } from "./sync";
+import type { PluginData, Settings, VaultIO } from "./sync";
 import { MeetingNotesSettingTab } from "./settings-tab";
 
 /** Delay after layout-ready before the on-launch sync, so startup is never slowed. */

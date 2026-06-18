@@ -3,7 +3,7 @@
  * meeting source (MacParakeet CLI, Fellow REST API, …) behind a common shape.
  */
 
-import type { AiResult, MeetingDetail, MeetingSummary } from "../cli/types";
+import type { AiResult, MeetingDetail } from "../cli/types";
 import type { Settings, SourceName } from "../sync/types";
 
 /** A meeting as seen by the engine, independent of its originating source. */
@@ -18,7 +18,7 @@ export interface SourceMeeting {
 }
 
 /** Detail fetch result, normalized across sources. */
-export interface SourceMeetingDetail extends MeetingDetail {}
+export type SourceMeetingDetail = MeetingDetail;
 
 /** One enabled source adapter. Disabled adapters are never invoked by the engine. */
 export interface SourceAdapter {
