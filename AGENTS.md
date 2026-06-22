@@ -3,6 +3,34 @@
 Conventions and gotchas for AI agents working in this repo. Record new learnings
 here — not in any agent's private/internal memory.
 
+## Session Start Workflow
+
+Before making code or documentation changes in this repo:
+
+1. Switch back to `master`.
+2. Pull the latest changes with `git pull --ff-only`.
+3. Create a new branch with a short, descriptive name related to the feature being added or the bug being fixed.
+4. Make the requested changes on that branch.
+
+Do not start work from an old feature branch unless the user explicitly asks to continue that branch.
+
+## Meeting numbering
+
+A meeting's `n` is **frozen** — `assignNumber` (`src/sync/state.ts`) hands out
+the next free number in its `{year}/{month}` bucket once and never reassigns it,
+so deletions leave gaps and the counter only ever grows.
+
+**The one exception is the manual merge** (`src/sync/merge.ts`, the
+`Merge two meetings…` command). When two cross-source duplicates are merged, the
+lower number survives and every later meeting *in the same bucket* shifts down by
+one to close the gap; `state.counters[bucket]` is reset to the new max + 1. That
+renames folders and folder-note files for the shifted meetings — `VaultIO.rename`
+is backed by `app.fileManager.renameFile`, which rewrites internal links, so
+this is the only path that renames/deletes vault files (the sync engine itself
+only creates/overwrites). Merges are restricted to **disjoint sources** (one
+MacParakeet + one Fellow); same-source pairs can't merge because the data model
+holds one binding per source and artifact filenames are source-suffixed.
+
 ## Releases
 
 `.github/workflows/release.yml` cuts a GitHub release with:
