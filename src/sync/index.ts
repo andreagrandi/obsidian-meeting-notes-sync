@@ -1,5 +1,7 @@
 export { SyncEngine, inScope, isSourceUnchanged } from "./engine";
 export type { SyncEngineDeps } from "./engine";
+export { mergeMeetings, MergeError } from "./merge";
+export type { MergeMeetingsDeps, MergeResult } from "./merge";
 export {
 	bucketKey,
 	dateParts,

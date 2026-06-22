@@ -93,6 +93,34 @@ class FakeVault implements VaultIO {
 		this.files.set(path, content);
 		this.writeLog.push(path);
 	}
+	async rename(fromPath: string, toPath: string): Promise<void> {
+		const prefix = `${fromPath}/`;
+		for (const key of [...this.files.keys()]) {
+			if (key === fromPath || key.startsWith(prefix)) {
+				this.files.set(`${toPath}${key.slice(fromPath.length)}`, this.files.get(key) as string);
+				this.files.delete(key);
+			}
+		}
+		for (const folder of [...this.folders]) {
+			if (folder === fromPath || folder.startsWith(prefix)) {
+				this.folders.delete(folder);
+				this.folders.add(`${toPath}${folder.slice(fromPath.length)}`);
+			}
+		}
+	}
+	async trash(path: string): Promise<void> {
+		const prefix = `${path}/`;
+		for (const key of [...this.files.keys()]) {
+			if (key === path || key.startsWith(prefix)) {
+				this.files.delete(key);
+			}
+		}
+		for (const folder of [...this.folders]) {
+			if (folder === path || folder.startsWith(prefix)) {
+				this.folders.delete(folder);
+			}
+		}
+	}
 }
 
 function settings(overrides: Partial<Settings> = {}): Settings {

@@ -137,6 +137,10 @@ export interface VaultIO {
 	fileExists(path: string): Promise<boolean>;
 	/** Create or overwrite a file, creating parent folders as needed. */
 	write(path: string, content: string): Promise<void>;
+	/** Move/rename a file or folder, updating links where the host supports it. */
+	rename(fromPath: string, toPath: string): Promise<void>;
+	/** Send a file or folder to the system trash (recoverable); a no-op if absent. */
+	trash(path: string): Promise<void>;
 }
 
 /** A source that failed during a run without aborting the other sources. */

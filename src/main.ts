@@ -3,9 +3,10 @@ import { existsSync } from "node:fs";
 import { CliBridge, nodeCommandRunner } from "./cli";
 import { FellowClient, type FellowHttp } from "./fellow";
 import { MacParakeetAdapter, FellowAdapter } from "./sources";
-import { SyncEngine, SyncRunner, describeError, normalizeData } from "./sync";
-import type { PluginData, Settings, VaultIO } from "./sync";
+import { SyncEngine, SyncRunner, describeError, mergeMeetings, normalizeData } from "./sync";
+import type { MergeResult, PluginData, Settings, SyncStateData, VaultIO } from "./sync";
 import { MeetingNotesSettingTab } from "./settings-tab";
+import { MergeMeetingsModal } from "./merge-modal";
 
 /** Delay after layout-ready before the on-launch sync, so startup is never slowed. */
 const LAUNCH_DELAY_MS = 15_000;
@@ -30,6 +31,7 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 	private fellow!: FellowClient;
 	private engine!: SyncEngine;
 	private runner!: SyncRunner;
+	private vaultIO!: ObsidianVaultIO;
 	private data!: PluginData;
 	private intervalId: number | null = null;
 	private launchTimeoutId: number | null = null;
@@ -52,12 +54,14 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 			}),
 		});
 
+		this.vaultIO = new ObsidianVaultIO(this);
+
 		this.engine = new SyncEngine({
 			sources: [
 				new MacParakeetAdapter(this.cli),
 				new FellowAdapter(this.fellow, () => this.data.settings),
 			],
-			vault: new ObsidianVaultIO(this),
+			vault: this.vaultIO,
 			getSettings: () => this.data.settings,
 			getState: () => this.data.state,
 			persist: () => this.saveData(this.data),
@@ -100,6 +104,14 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "merge-meetings",
+			name: "Merge two meetings…",
+			callback: () => {
+				new MergeMeetingsModal(this.app, this).open();
+			},
+		});
+
 		this.addSettingTab(new MeetingNotesSettingTab(this.app, this));
 
 		this.applySchedule();
@@ -118,6 +130,34 @@ export default class MeetingNotesSyncPlugin extends Plugin {
 	/** Current settings; the engine and settings tab read these live. */
 	getSettings(): Settings {
 		return this.data.settings;
+	}
+
+	/** Live sync state; the merge modal reads the meetings map from here. */
+	getState(): SyncStateData {
+		return this.data.state;
+	}
+
+	/**
+	 * Merge two cross-source duplicate meetings into one and persist the result.
+	 * Surfaces success or failure as a Notice; called by the merge modal.
+	 */
+	async mergeMeetings(keyA: string, keyB: string, options: { title: string }): Promise<void> {
+		try {
+			const result: MergeResult = await mergeMeetings({
+				state: this.data.state,
+				settings: this.data.settings,
+				vault: this.vaultIO,
+				keyA,
+				keyB,
+				title: options.title,
+			});
+			await this.saveData(this.data);
+			const tail = result.renumbered > 0 ? `, renumbered ${result.renumbered}` : "";
+			new Notice(`Meeting Notes Sync: merged into ${result.folderPath}${tail}.`);
+		} catch (error) {
+			new Notice(`Meeting Notes Sync: ${describeError(error)}`);
+			console.error("Meeting Notes Sync: merge failed", error);
+		}
 	}
 
 	/** Merge a settings patch and persist it; takes effect on the next sync. */
@@ -236,6 +276,24 @@ class ObsidianVaultIO implements VaultIO {
 			await this.createFolder(parent);
 		}
 		await this.vault.create(normalized, content);
+	}
+
+	async rename(fromPath: string, toPath: string): Promise<void> {
+		const file = this.vault.getAbstractFileByPath(normalizePath(fromPath));
+		if (!file) {
+			throw new Error(`Cannot rename missing path: ${fromPath}`);
+		}
+		// fileManager.renameFile handles both files and folders and rewrites
+		// backlinks across the vault, so internal links survive the move.
+		await this.plugin.app.fileManager.renameFile(file, normalizePath(toPath));
+	}
+
+	async trash(path: string): Promise<void> {
+		const file = this.vault.getAbstractFileByPath(normalizePath(path));
+		if (!file) {
+			return;
+		}
+		await this.vault.trash(file, true);
 	}
 }
 
