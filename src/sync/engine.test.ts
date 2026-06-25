@@ -398,9 +398,11 @@ describe("SyncEngine — v1 upgrade", () => {
 		// Numbering and folder are untouched; only the canonical interval is added.
 		expect(state.meetings["m-1"]?.n).toBe(1);
 		expect(state.meetings["m-1"]?.folderPath).toBe(LEGACY_FOLDER);
+		// MacParakeet's createdAt is the save time (the meeting END), so the
+		// canonical interval runs back one duration from it.
 		expect(state.meetings["m-1"]?.interval).toEqual({
-			start: "2026-06-12T10:00:00.000Z",
-			end: "2026-06-12T10:47:00.000Z",
+			start: "2026-06-12T09:13:00.000Z",
+			end: "2026-06-12T10:00:00.000Z",
 		});
 	});
 
@@ -419,9 +421,10 @@ describe("SyncEngine — v1 upgrade", () => {
 			id: "m-1",
 			snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 },
 		});
+		// createdAt (10:00:00) is MacParakeet's save time, i.e. the meeting END.
 		expect(state.meetings["m-1"]?.interval).toEqual({
-			start: "2026-06-12T10:00:00.000Z",
-			end: "2026-06-12T10:47:00.000Z",
+			start: "2026-06-12T09:13:00.000Z",
+			end: "2026-06-12T10:00:00.000Z",
 		});
 	});
 

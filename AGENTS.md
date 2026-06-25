@@ -31,6 +31,27 @@ only creates/overwrites). Merges are restricted to **disjoint sources** (one
 MacParakeet + one Fellow); same-source pairs can't merge because the data model
 holds one binding per source and artifact filenames are source-suffixed.
 
+## Source timestamps (createdAt is a *start*, except MacParakeet)
+
+The engine treats a `SourceMeeting.createdAt` as the meeting **start**: it dates
+the note from it, buckets by its month, and builds the canonical matching
+interval as `[createdAt, createdAt + durationMs]` (`intervalFromDuration`,
+`src/sync/state.ts`).
+
+**Gotcha — MacParakeet's `createdAt` is the recording END (save time), not the
+start.** The CLI stamps it when the recording is finalized (its manifest is
+generated within seconds of `createdAt`, for a meeting that ran far longer), and
+it exposes *no* start field (only `createdAt`, `updatedAt`, `durationMs`; internal
+metadata uses a monotonic `hostTime`, not wall-clock). So `MacParakeetAdapter`
+(`src/sources/macparakeet.ts`) normalizes it to the real start
+(`createdAt − durationMs`) before handing meetings to the engine. Without that,
+every MacParakeet meeting's window lands one full duration too late, which
+mis-dates notes and overlaps the *next* meeting during cross-source matching
+(swallowing Fellow recaps into the wrong meeting). Fellow already maps
+`createdAt` from a real `started_at` (`src/fellow/mapper.ts`) and is unaffected —
+do not "fix" it. The derived start is only as good as `durationMs`; a paused or
+re-recorded session whose duration no longer matches wall-clock can still be off.
+
 ## Releases
 
 `.github/workflows/release.yml` cuts a GitHub release with:
