@@ -58,7 +58,7 @@ Sync runs shortly after launch and every 30 minutes (configurable; `0` disables)
 - **Sources** — enable MacParakeet and/or Fellow (see above).
 - **Base folder** — where meeting folders go (empty = vault root, so the default template's `Meetings/…` is the root).
 - **Path template** — folder path per meeting (see tokens below).
-- **Content** — AI results (on), meeting notes (on), full transcript (off; transcripts are long). Applies to every source.
+- **Content** — AI results (on), meeting notes (on), full transcript (off; transcripts are long). Applies to every source; for merged meetings, choose whether to keep every transcript or only the MacParakeet/Fellow transcript.
 - **Sync since** — only meetings on/after this date import (default: install date). Move it back to backfill history.
 
 ### Path template tokens
@@ -82,7 +82,7 @@ Default: `Meetings/{year}/{month} - {monthName}/{n} - {title} - {monthShort} {da
 ### Good to know
 
 - Numbering (`{n}`) and the folder name are frozen on first import and never change — a later source merges in without renumbering.
-- Synced files are **mirrors** and get overwritten when the source changes; keep your own thoughts in separate files. Toggling content types or sources on applies going forward, not retroactively.
+- Synced files are **mirrors** and get overwritten when the source changes; keep your own thoughts in separate files. Toggling content types, sources, or the merged-transcript preference applies going forward, or immediately with **Force re-sync**.
 - A failing source (e.g. a revoked Fellow key) shows one Notice without blocking the others, and is reported by the settings connection check.
 
 ## How it works

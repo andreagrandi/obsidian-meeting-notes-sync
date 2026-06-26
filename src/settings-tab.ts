@@ -1,4 +1,10 @@
-import { type App, PluginSettingTab, Setting, debounce, normalizePath } from "obsidian";
+import {
+	type App,
+	PluginSettingTab,
+	Setting,
+	debounce,
+	normalizePath,
+} from "obsidian";
 import type MeetingNotesSyncPlugin from "./main";
 import {
 	cleanBaseFolder,
@@ -6,6 +12,7 @@ import {
 	cleanMinimumOverlapMinutes,
 	cleanOverlapThreshold,
 	cleanSubdomain,
+	cleanTranscriptSourcePreference,
 	isValidSyncSince,
 	isValidTemplate,
 } from "./settings";
@@ -58,14 +65,18 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 						),
 					),
 			);
-		this.cliStatusEl = containerEl.createEl("div", { cls: "setting-item-description" });
+		this.cliStatusEl = containerEl.createEl("div", {
+			cls: "setting-item-description",
+		});
 		void this.refreshCliStatus();
 
 		new Setting(containerEl).setName("Fellow").setHeading();
 
 		new Setting(containerEl)
 			.setName("Enable Fellow source")
-			.setDesc("Import AI recaps from Fellow. Requires a paid plan with the API enabled.")
+			.setDesc(
+				"Import AI recaps from Fellow. Requires a paid plan with the API enabled.",
+			)
 			.addToggle((toggle) =>
 				toggle.setValue(settings.sourceFellowEnabled).onChange((value) => {
 					void this.plugin.updateSettings({ sourceFellowEnabled: value });
@@ -82,7 +93,9 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 					.onChange(
 						debounce(
 							async (value: string) => {
-								await this.plugin.updateSettings({ fellowSubdomain: cleanSubdomain(value) });
+								await this.plugin.updateSettings({
+									fellowSubdomain: cleanSubdomain(value),
+								});
 								await this.refreshFellowStatus();
 							},
 							600,
@@ -110,7 +123,9 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 				);
 			});
 
-		this.fellowStatusEl = containerEl.createEl("div", { cls: "setting-item-description" });
+		this.fellowStatusEl = containerEl.createEl("div", {
+			cls: "setting-item-description",
+		});
 		void this.refreshFellowStatus();
 
 		new Setting(containerEl).setName("Merge").setHeading();
@@ -122,18 +137,26 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 				text.inputEl.type = "number";
 				text.inputEl.step = "0.05";
 				text.setValue(String(settings.overlapThreshold)).onChange((value) => {
-					void this.plugin.updateSettings({ overlapThreshold: cleanOverlapThreshold(value) });
+					void this.plugin.updateSettings({
+						overlapThreshold: cleanOverlapThreshold(value),
+					});
 				});
 			});
 
 		new Setting(containerEl)
 			.setName("Minimum overlap (minutes)")
-			.setDesc("Absolute minimum overlap required before a merge is considered.")
+			.setDesc(
+				"Absolute minimum overlap required before a merge is considered.",
+			)
 			.addText((text) => {
 				text.inputEl.type = "number";
-				text.setValue(String(settings.minimumOverlapMinutes)).onChange((value) => {
-					void this.plugin.updateSettings({ minimumOverlapMinutes: cleanMinimumOverlapMinutes(value) });
-				});
+				text
+					.setValue(String(settings.minimumOverlapMinutes))
+					.onChange((value) => {
+						void this.plugin.updateSettings({
+							minimumOverlapMinutes: cleanMinimumOverlapMinutes(value),
+						});
+					});
 			});
 
 		new Setting(containerEl).setName("Vault layout").setHeading();
@@ -143,11 +166,15 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 			.setDesc("Vault folder all meeting folders are created under.")
 			.addText((text) =>
 				text.setValue(settings.baseFolder).onChange((value) => {
-					void this.plugin.updateSettings({ baseFolder: normalizePath(cleanBaseFolder(value)) });
+					void this.plugin.updateSettings({
+						baseFolder: normalizePath(cleanBaseFolder(value)),
+					});
 				}),
 			);
 
-		const templateError = containerEl.createEl("div", { cls: "setting-item-description mod-warning" });
+		const templateError = containerEl.createEl("div", {
+			cls: "setting-item-description mod-warning",
+		});
 		new Setting(containerEl)
 			.setName("Path template")
 			.setDesc(
@@ -164,10 +191,14 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 				}),
 			);
 
-		const sinceError = containerEl.createEl("div", { cls: "setting-item-description mod-warning" });
+		const sinceError = containerEl.createEl("div", {
+			cls: "setting-item-description mod-warning",
+		});
 		new Setting(containerEl)
 			.setName("Sync meetings since")
-			.setDesc("Only meetings created on/after this date are imported. Empty = the install date.")
+			.setDesc(
+				"Only meetings created on/after this date are imported. Empty = the install date.",
+			)
 			.addText((text) => {
 				text.inputEl.type = "date";
 				text.setValue(settings.syncSince).onChange((value) => {
@@ -202,11 +233,32 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Sync transcript")
-			.setDesc("Import the full transcript as Transcript.md. Transcripts can be long; off by default.")
+			.setDesc(
+				"Import the full transcript as Transcript.md. Transcripts can be long; off by default.",
+			)
 			.addToggle((toggle) =>
 				toggle.setValue(settings.syncTranscript).onChange((value) => {
 					void this.plugin.updateSettings({ syncTranscript: value });
 				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Merged meeting transcripts")
+			.setDesc(
+				"When both sources have a transcript for one meeting, keep all transcripts or only one preferred source.",
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("all", "All sources")
+					.addOption("macparakeet", "Prefer MacParakeet")
+					.addOption("fellow", "Prefer Fellow")
+					.setValue(settings.transcriptSourcePreference)
+					.onChange((value) => {
+						void this.plugin.updateSettings({
+							transcriptSourcePreference:
+								cleanTranscriptSourcePreference(value),
+						});
+					}),
 			);
 
 		new Setting(containerEl).setName("Triggers").setHeading();
@@ -216,9 +268,13 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 			.setDesc("How often to sync in the background. 0 disables the timer.")
 			.addText((text) => {
 				text.inputEl.type = "number";
-				text.setValue(String(settings.syncIntervalMinutes)).onChange((value) => {
-					void this.plugin.updateSettings({ syncIntervalMinutes: cleanInterval(value) });
-				});
+				text
+					.setValue(String(settings.syncIntervalMinutes))
+					.onChange((value) => {
+						void this.plugin.updateSettings({
+							syncIntervalMinutes: cleanInterval(value),
+						});
+					});
 			});
 
 		new Setting(containerEl)
@@ -241,7 +297,9 @@ export class MeetingNotesSettingTab extends PluginSettingTab {
 		el.setText("Checking macparakeet-cli…");
 		const status = await this.plugin.validateCli();
 		if (status.ok) {
-			el.setText(`Connected · ${status.path} · ${status.meetingCount} meetings`);
+			el.setText(
+				`Connected · ${status.path} · ${status.meetingCount} meetings`,
+			);
 		} else {
 			el.addClass("mod-warning");
 			el.setText(`Not connected: ${status.error}`);

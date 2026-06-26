@@ -14,6 +14,7 @@ import {
 	type SourceName,
 	type SourceSnapshot,
 	type SyncStateData,
+	type TranscriptSourcePreference,
 	emptyState,
 } from "./types";
 
@@ -38,15 +39,46 @@ function normalizeSettings(raw: unknown): Settings {
 		syncResults: asBool(obj.syncResults, DEFAULT_SETTINGS.syncResults),
 		syncNotes: asBool(obj.syncNotes, DEFAULT_SETTINGS.syncNotes),
 		syncTranscript: asBool(obj.syncTranscript, DEFAULT_SETTINGS.syncTranscript),
-		syncIntervalMinutes: asNumber(obj.syncIntervalMinutes, DEFAULT_SETTINGS.syncIntervalMinutes),
+		transcriptSourcePreference: normalizeTranscriptSourcePreference(
+			obj.transcriptSourcePreference,
+		),
+		syncIntervalMinutes: asNumber(
+			obj.syncIntervalMinutes,
+			DEFAULT_SETTINGS.syncIntervalMinutes,
+		),
 		syncOnLaunch: asBool(obj.syncOnLaunch, DEFAULT_SETTINGS.syncOnLaunch),
-		sourceMacparakeetEnabled: asBool(obj.sourceMacparakeetEnabled, DEFAULT_SETTINGS.sourceMacparakeetEnabled),
-		sourceFellowEnabled: asBool(obj.sourceFellowEnabled, DEFAULT_SETTINGS.sourceFellowEnabled),
-		fellowSubdomain: asString(obj.fellowSubdomain, DEFAULT_SETTINGS.fellowSubdomain),
+		sourceMacparakeetEnabled: asBool(
+			obj.sourceMacparakeetEnabled,
+			DEFAULT_SETTINGS.sourceMacparakeetEnabled,
+		),
+		sourceFellowEnabled: asBool(
+			obj.sourceFellowEnabled,
+			DEFAULT_SETTINGS.sourceFellowEnabled,
+		),
+		fellowSubdomain: asString(
+			obj.fellowSubdomain,
+			DEFAULT_SETTINGS.fellowSubdomain,
+		),
 		fellowApiKey: asString(obj.fellowApiKey, DEFAULT_SETTINGS.fellowApiKey),
-		overlapThreshold: clampOverlap(asNumber(obj.overlapThreshold, DEFAULT_SETTINGS.overlapThreshold)),
-		minimumOverlapMinutes: clampMinutes(asNumber(obj.minimumOverlapMinutes, DEFAULT_SETTINGS.minimumOverlapMinutes)),
+		overlapThreshold: clampOverlap(
+			asNumber(obj.overlapThreshold, DEFAULT_SETTINGS.overlapThreshold),
+		),
+		minimumOverlapMinutes: clampMinutes(
+			asNumber(
+				obj.minimumOverlapMinutes,
+				DEFAULT_SETTINGS.minimumOverlapMinutes,
+			),
+		),
 	};
+}
+
+function normalizeTranscriptSourcePreference(
+	value: unknown,
+): TranscriptSourcePreference {
+	if (value === "all" || value === "macparakeet" || value === "fellow") {
+		return value;
+	}
+	return DEFAULT_SETTINGS.transcriptSourcePreference;
 }
 
 function normalizeState(raw: unknown, installDate: string): SyncStateData {
@@ -63,7 +95,9 @@ function normalizeState(raw: unknown, installDate: string): SyncStateData {
 	}
 	return {
 		installDate: asString(raw.installDate, installDate),
-		counters: isRecord(raw.counters) ? (raw.counters as Record<string, number>) : {},
+		counters: isRecord(raw.counters)
+			? (raw.counters as Record<string, number>)
+			: {},
 		meetings,
 	};
 }
@@ -103,12 +137,17 @@ function normalizeRecord(key: string, raw: unknown): MeetingRecord | undefined {
 	return record;
 }
 
-function normalizeSources(raw: Record<string, unknown>): Partial<Record<SourceName, SourceBinding>> {
+function normalizeSources(
+	raw: Record<string, unknown>,
+): Partial<Record<SourceName, SourceBinding>> {
 	const sources: Partial<Record<SourceName, SourceBinding>> = {};
 	for (const name of SOURCE_NAMES) {
 		const binding = raw[name];
 		if (isRecord(binding) && typeof binding.id === "string") {
-			sources[name] = { id: binding.id, snapshot: normalizeSnapshot(binding.snapshot) };
+			sources[name] = {
+				id: binding.id,
+				snapshot: normalizeSnapshot(binding.snapshot),
+			};
 		}
 	}
 	return sources;
@@ -135,7 +174,11 @@ function normalizeInterval(raw: unknown): Interval | undefined {
  * Return the frozen number for a meeting, assigning the next free one in its
  * bucket on first sight. Mutates `state.counters` only when assigning.
  */
-export function assignNumber(state: SyncStateData, meetingId: string, bucket: string): number {
+export function assignNumber(
+	state: SyncStateData,
+	meetingId: string,
+	bucket: string,
+): number {
 	const existing = state.meetings[meetingId];
 	if (existing) {
 		return existing.n;
@@ -146,7 +189,10 @@ export function assignNumber(state: SyncStateData, meetingId: string, bucket: st
 }
 
 /** The date (YYYY-MM-DD) below which meetings are out of scope. */
-export function effectiveSyncSince(settings: Settings, state: SyncStateData): string {
+export function effectiveSyncSince(
+	settings: Settings,
+	state: SyncStateData,
+): string {
 	return settings.syncSince.trim() || state.installDate;
 }
 
@@ -173,12 +219,19 @@ export function buildSourceIndex(state: SyncStateData): Map<string, string> {
 }
 
 /** The meetings-map key a source id is bound to, or undefined. */
-export function findBySource(index: Map<string, string>, source: SourceName, id: string): string | undefined {
+export function findBySource(
+	index: Map<string, string>,
+	source: SourceName,
+	id: string,
+): string | undefined {
 	return index.get(sourceIndexKey(source, id));
 }
 
 /** Canonical interval from a source's start instant and duration in ms. */
-export function intervalFromDuration(startIso: string, durationMs: number): Interval {
+export function intervalFromDuration(
+	startIso: string,
+	durationMs: number,
+): Interval {
 	const start = new Date(startIso);
 	const end = new Date(start.getTime() + Math.max(0, durationMs));
 	return { start: start.toISOString(), end: end.toISOString() };

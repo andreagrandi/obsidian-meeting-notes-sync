@@ -5,6 +5,12 @@
 
 import type { AiResult, MeetingDetail, MeetingSummary } from "../cli/types";
 
+/** The meeting sources the plugin can ingest from. */
+export type SourceName = "macparakeet" | "fellow";
+
+/** Which transcript to keep when several sources are bound to the same meeting. */
+export type TranscriptSourcePreference = "all" | SourceName;
+
 /** User-configurable settings; persisted in data.json alongside sync state (PLAN §4). */
 export interface Settings {
 	/** Manual CLI path override; empty means auto-discover. */
@@ -16,6 +22,8 @@ export interface Settings {
 	syncResults: boolean;
 	syncNotes: boolean;
 	syncTranscript: boolean;
+	/** For merged meetings, which source transcript to keep; "all" keeps every source. */
+	transcriptSourcePreference: TranscriptSourcePreference;
 	/** Background interval in minutes; 0 disables. */
 	syncIntervalMinutes: number;
 	syncOnLaunch: boolean;
@@ -35,11 +43,13 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
 	cliPath: "",
 	baseFolder: "",
-	pathTemplate: "Meetings/{year}/{month} - {monthName}/{n} - {title} - {monthShort} {dayOrdinal}",
+	pathTemplate:
+		"Meetings/{year}/{month} - {monthName}/{n} - {title} - {monthShort} {dayOrdinal}",
 	syncSince: "",
 	syncResults: true,
 	syncNotes: true,
 	syncTranscript: false,
+	transcriptSourcePreference: "all",
 	syncIntervalMinutes: 30,
 	syncOnLaunch: true,
 	sourceMacparakeetEnabled: false,
@@ -58,9 +68,6 @@ export interface FileRecord {
 	/** Owning source; absent on legacy (v1) records, treated as macparakeet. */
 	source?: SourceName;
 }
-
-/** The meeting sources the plugin can ingest from. */
-export type SourceName = "macparakeet" | "fellow";
 
 /** A canonical real-world time interval (ISO 8601) for cross-source matching. */
 export interface Interval {

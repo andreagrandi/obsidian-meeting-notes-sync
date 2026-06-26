@@ -17,7 +17,11 @@ export {
 	renderFrontmatter,
 	renderIndex,
 } from "./renderer";
-export type { RenderArtifactsInput, RenderIndexInput, RenderedFile } from "./renderer";
+export type {
+	RenderArtifactsInput,
+	RenderIndexInput,
+	RenderedFile,
+} from "./renderer";
 export { SyncRunner, describeError, formatSummary } from "./runner";
 export type { SyncRunnerDeps, SyncTrigger } from "./runner";
 export {
@@ -52,5 +56,6 @@ export type {
 	SyncOptions,
 	SyncStateData,
 	SyncSummary,
+	TranscriptSourcePreference,
 	VaultIO,
 } from "./types";
