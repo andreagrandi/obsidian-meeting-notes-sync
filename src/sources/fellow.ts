@@ -20,8 +20,13 @@ import type { SourceAdapter, SourceMeeting } from "./types";
 export class FellowAdapter implements SourceAdapter {
 	readonly source = "fellow";
 
-	/** Last recording detail fetched, reused across the show/results pair for one meeting. */
-	private cached: { id: string; recording: FellowRecording } | null = null;
+	/** Last recording detail fetched, reused across the show/results pair for one listed snapshot. */
+	private cached: {
+		id: string;
+		listUpdatedAt: string | undefined;
+		recording: FellowRecording;
+	} | null = null;
+	private listedUpdatedAt = new Map<string, string>();
 
 	constructor(
 		private readonly client: FellowClient,
@@ -37,14 +42,25 @@ export class FellowAdapter implements SourceAdapter {
 	}
 
 	async listMeetings(): Promise<SourceMeeting[]> {
-		const recordings = await this.client.listRecordings({ updatedAtStart: this.updatedAtStart() });
+		const recordings = await this.client.listRecordings({
+			updatedAtStart: this.updatedAtStart(),
+		});
+		this.listedUpdatedAt = new Map(
+			recordings.map((recording) => [
+				recording.id,
+				recordingUpdatedAt(recording),
+			]),
+		);
 		return recordings.map(recordingToSourceMeeting);
 	}
 
 	async showMeeting(id: string): Promise<MeetingDetail> {
 		const recording = await this.recording(id);
 		const noteId = recording.note_id;
-		const note = this.getSettings().syncNotes && noteId ? await this.client.getNote(noteId) : null;
+		const note =
+			this.getSettings().syncNotes && noteId
+				? await this.client.getNote(noteId)
+				: null;
 		return recordingToDetail(recording, note);
 	}
 
@@ -55,11 +71,12 @@ export class FellowAdapter implements SourceAdapter {
 
 	/** Fetch a recording's detail, serving the show/results pair from one call. */
 	private async recording(id: string): Promise<FellowRecording> {
-		if (this.cached?.id === id) {
+		const listUpdatedAt = this.listedUpdatedAt.get(id);
+		if (this.cached?.id === id && this.cached.listUpdatedAt === listUpdatedAt) {
 			return this.cached.recording;
 		}
 		const recording = await this.client.getRecording(id);
-		this.cached = { id, recording };
+		this.cached = { id, listUpdatedAt, recording };
 		return recording;
 	}
 
@@ -68,4 +85,8 @@ export class FellowAdapter implements SourceAdapter {
 		const since = this.getSettings().syncSince.trim();
 		return since ? `${since}T00:00:00Z` : undefined;
 	}
+}
+
+function recordingUpdatedAt(recording: FellowRecording): string {
+	return recording.updated_at ?? recording.started_at;
 }
