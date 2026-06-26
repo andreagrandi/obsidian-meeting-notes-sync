@@ -293,7 +293,7 @@ class ObsidianVaultIO implements VaultIO {
 		if (!file) {
 			return;
 		}
-		await this.vault.trash(file, true);
+		await this.plugin.app.fileManager.trashFile(file);
 	}
 }
 
