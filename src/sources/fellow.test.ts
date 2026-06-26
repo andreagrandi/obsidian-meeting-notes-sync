@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FellowClient, type FellowHttp, type FellowRecording } from "../fellow";
 import { SyncEngine } from "../sync/engine";
-import { DEFAULT_SETTINGS, emptyState, type Settings, type SyncStateData, type VaultIO } from "../sync/types";
+import {
+	DEFAULT_SETTINGS,
+	emptyState,
+	type Settings,
+	type SyncStateData,
+	type VaultIO,
+} from "../sync/types";
 import { FellowAdapter } from "./fellow";
 
 const LIST_ROW: FellowRecording = {
@@ -23,7 +29,9 @@ const LIST_ROW: FellowRecording = {
 const RECORDING_DETAIL: FellowRecording = {
 	...LIST_ROW,
 	transcript: {
-		speech_segments: [{ start: 0, end: 2, speaker: "Alex", text: "Let's begin." }],
+		speech_segments: [
+			{ start: 0, end: 2, speaker: "Alex", text: "Let's begin." },
+		],
 		language_code: "en",
 	},
 	ai_notes: [
@@ -32,7 +40,13 @@ const RECORDING_DETAIL: FellowRecording = {
 			is_active: true,
 			title: "GENERAL",
 			template_creator: "Fellow",
-			sections: [{ title: "Summary", type: "STANDARD", content: "We shipped the release." }],
+			sections: [
+				{
+					title: "Summary",
+					type: "STANDARD",
+					content: "We shipped the release.",
+				},
+			],
 		},
 	],
 };
@@ -61,7 +75,12 @@ function fellowTransport() {
 	const http: FellowHttp = async (req) => {
 		if (req.url.endsWith("/recordings") && req.method === "POST") {
 			counts.list += 1;
-			return json({ recordings: { page_info: { cursor: null, page_size: 50 }, data: [LIST_ROW] } });
+			return json({
+				recordings: {
+					page_info: { cursor: null, page_size: 50 },
+					data: [LIST_ROW],
+				},
+			});
 		}
 		if (req.url.includes("/recording/")) {
 			counts.recording += 1;
@@ -97,7 +116,10 @@ class FakeVault implements VaultIO {
 		const prefix = `${fromPath}/`;
 		for (const key of [...this.files.keys()]) {
 			if (key === fromPath || key.startsWith(prefix)) {
-				this.files.set(`${toPath}${key.slice(fromPath.length)}`, this.files.get(key) as string);
+				this.files.set(
+					`${toPath}${key.slice(fromPath.length)}`,
+					this.files.get(key) as string,
+				);
 				this.files.delete(key);
 			}
 		}
@@ -135,8 +157,19 @@ function settings(overrides: Partial<Settings> = {}): Settings {
 	};
 }
 
-function makeEngine(http: FellowHttp, state: SyncStateData, live: Settings, vault: VaultIO) {
-	const client = new FellowClient({ http, getConfig: () => ({ subdomain: live.fellowSubdomain, apiKey: live.fellowApiKey }) });
+function makeEngine(
+	http: FellowHttp,
+	state: SyncStateData,
+	live: Settings,
+	vault: VaultIO,
+) {
+	const client = new FellowClient({
+		http,
+		getConfig: () => ({
+			subdomain: live.fellowSubdomain,
+			apiKey: live.fellowApiKey,
+		}),
+	});
 	const adapter = new FellowAdapter(client, () => live);
 	return new SyncEngine({
 		sources: [adapter],
@@ -153,14 +186,27 @@ describe("FellowAdapter — end to end through the engine", () => {
 	it("imports a Fellow meeting into the vault layout", async () => {
 		const { http, counts } = fellowTransport();
 		const vault = new FakeVault();
-		const result = await makeEngine(http, emptyState("2026-06-01"), settings({ syncTranscript: true }), vault).sync();
+		const result = await makeEngine(
+			http,
+			emptyState("2026-06-01"),
+			settings({ syncTranscript: true }),
+			vault,
+		).sync();
 
 		expect(result).toEqual({ created: 1, updated: 0, unchanged: 0 });
 		expect(vault.folders.has(FOLDER)).toBe(true);
-		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup - Jun 11th.md`)).toBe(true);
-		expect(vault.files.get(`${FOLDER}/Summary (Fellow).md`)).toContain("We shipped the release.");
-		expect(vault.files.get(`${FOLDER}/Notes (Fellow).md`)).toContain("Ship it.");
-		expect(vault.files.get(`${FOLDER}/Transcript (Fellow).md`)).toContain("**Alex:** Let's begin.");
+		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup - Jun 11th.md`)).toBe(
+			true,
+		);
+		expect(vault.files.get(`${FOLDER}/Summary (Fellow).md`)).toContain(
+			"We shipped the release.",
+		);
+		expect(vault.files.get(`${FOLDER}/Notes (Fellow).md`)).toContain(
+			"Ship it.",
+		);
+		expect(vault.files.get(`${FOLDER}/Transcript (Fellow).md`)).toContain(
+			"**Alex:** Let's begin.",
+		);
 		// show + results share a single recording fetch.
 		expect(counts.recording).toBe(1);
 		expect(counts.note).toBe(1);
@@ -190,7 +236,12 @@ describe("FellowAdapter — end to end through the engine", () => {
 		// Configured, but the enable flag is off — the engine must never touch it.
 		const live = settings({ sourceFellowEnabled: false });
 
-		const result = await makeEngine(http, emptyState("2026-06-01"), live, vault).sync();
+		const result = await makeEngine(
+			http,
+			emptyState("2026-06-01"),
+			live,
+			vault,
+		).sync();
 
 		expect(result).toEqual({ created: 0, updated: 0, unchanged: 0 });
 		expect(counts).toEqual({ list: 0, recording: 0, note: 0 });
@@ -211,7 +262,12 @@ describe("FellowAdapter — end to end through the engine", () => {
 		const { http, counts } = fellowTransport();
 		const vault = new FakeVault();
 
-		await makeEngine(http, emptyState("2026-06-01"), settings({ syncNotes: false }), vault).sync();
+		await makeEngine(
+			http,
+			emptyState("2026-06-01"),
+			settings({ syncNotes: false }),
+			vault,
+		).sync();
 
 		expect(counts.note).toBe(0);
 		expect(vault.files.has(`${FOLDER}/Notes (Fellow).md`)).toBe(false);
@@ -221,7 +277,12 @@ describe("FellowAdapter — end to end through the engine", () => {
 		const http: FellowHttp = async () => ({ status: 401, text: "" });
 		const vault = new FakeVault();
 
-		const result = await makeEngine(http, emptyState("2026-06-01"), settings(), vault).sync();
+		const result = await makeEngine(
+			http,
+			emptyState("2026-06-01"),
+			settings(),
+			vault,
+		).sync();
 
 		expect(result.created).toBe(0);
 		expect(result.errors).toHaveLength(1);
@@ -231,9 +292,80 @@ describe("FellowAdapter — end to end through the engine", () => {
 	});
 });
 
+describe("FellowAdapter — recording cache", () => {
+	it("refetches a cached recording detail when the listed updated_at changes", async () => {
+		const counts = { list: 0, recording: 0, note: 0 };
+		let listRow = LIST_ROW;
+		let recordingDetail: FellowRecording = {
+			...RECORDING_DETAIL,
+			ai_notes: null,
+		};
+		let note = {
+			...NOTE,
+			content_markdown: "# Talking Points\nFirst version.",
+		};
+		const http: FellowHttp = async (req) => {
+			if (req.url.endsWith("/recordings") && req.method === "POST") {
+				counts.list += 1;
+				return json({
+					recordings: {
+						page_info: { cursor: null, page_size: 50 },
+						data: [listRow],
+					},
+				});
+			}
+			if (req.url.includes("/recording/")) {
+				counts.recording += 1;
+				return json({ recording: recordingDetail });
+			}
+			if (req.url.includes("/note/")) {
+				counts.note += 1;
+				return json({ note });
+			}
+			throw new Error(`unexpected request: ${req.method} ${req.url}`);
+		};
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+		const live = settings();
+		const engine = makeEngine(http, state, live, vault);
+
+		await engine.sync();
+		expect(vault.files.has(`${FOLDER}/Summary (Fellow).md`)).toBe(false);
+		expect(vault.files.get(`${FOLDER}/Notes (Fellow).md`)).toContain(
+			"First version.",
+		);
+		const detailFetchesAfterFirst = counts.recording;
+		vault.writeLog.length = 0;
+
+		listRow = { ...LIST_ROW, updated_at: "2026-06-11T14:30:00.000Z" };
+		recordingDetail = {
+			...RECORDING_DETAIL,
+			updated_at: "2026-06-11T14:30:00.000Z",
+		};
+		note = { ...NOTE, content_markdown: "# Talking Points\nSecond version." };
+
+		const second = await engine.sync();
+
+		expect(second).toEqual({ created: 0, updated: 1, unchanged: 0 });
+		expect(counts.recording).toBe(detailFetchesAfterFirst + 1);
+		expect(vault.files.get(`${FOLDER}/Summary (Fellow).md`)).toContain(
+			"We shipped the release.",
+		);
+		expect(vault.files.get(`${FOLDER}/Notes (Fellow).md`)).toContain(
+			"Second version.",
+		);
+		expect(vault.files.get(`${FOLDER}/Notes (Fellow).md`)).not.toContain(
+			"First version.",
+		);
+	});
+});
+
 describe("FellowAdapter.isEnabled", () => {
 	function adapter() {
-		const client = new FellowClient({ http: async () => json({}), getConfig: () => ({ subdomain: "", apiKey: "" }) });
+		const client = new FellowClient({
+			http: async () => json({}),
+			getConfig: () => ({ subdomain: "", apiKey: "" }),
+		});
 		return new FellowAdapter(client, () => settings());
 	}
 
@@ -251,6 +383,8 @@ describe("FellowAdapter.isEnabled", () => {
 	});
 
 	it("is disabled when the flag is off", () => {
-		expect(adapter().isEnabled(settings({ sourceFellowEnabled: false }))).toBe(false);
+		expect(adapter().isEnabled(settings({ sourceFellowEnabled: false }))).toBe(
+			false,
+		);
 	});
 });
