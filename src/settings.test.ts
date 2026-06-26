@@ -5,13 +5,16 @@ import {
 	cleanMinimumOverlapMinutes,
 	cleanOverlapThreshold,
 	cleanSubdomain,
+	cleanTranscriptSourcePreference,
 	isValidSyncSince,
 	isValidTemplate,
 } from "./settings";
 
 describe("cleanBaseFolder", () => {
 	it("trims whitespace and strips leading/trailing slashes", () => {
-		expect(cleanBaseFolder("  /Notes/MacParakeet/  ")).toBe("Notes/MacParakeet");
+		expect(cleanBaseFolder("  /Notes/MacParakeet/  ")).toBe(
+			"Notes/MacParakeet",
+		);
 	});
 
 	it("collapses duplicate slashes", () => {
@@ -97,6 +100,18 @@ describe("cleanMinimumOverlapMinutes", () => {
 		expect(cleanMinimumOverlapMinutes("5")).toBe(5);
 		expect(cleanMinimumOverlapMinutes("5.9")).toBe(5);
 		expect(cleanMinimumOverlapMinutes("-1")).toBe(0);
+	});
+});
+
+describe("cleanTranscriptSourcePreference", () => {
+	it("accepts all supported transcript preferences", () => {
+		expect(cleanTranscriptSourcePreference("all")).toBe("all");
+		expect(cleanTranscriptSourcePreference("macparakeet")).toBe("macparakeet");
+		expect(cleanTranscriptSourcePreference("fellow")).toBe("fellow");
+	});
+
+	it("falls back to syncing every source for unknown values", () => {
+		expect(cleanTranscriptSourcePreference("other")).toBe("all");
 	});
 });
 

@@ -4,6 +4,7 @@
  */
 
 import { DEFAULT_SETTINGS } from "./sync";
+import type { TranscriptSourcePreference } from "./sync/types";
 
 /** Normalize a base-folder string: trim, strip stray slashes, fall back to default. */
 export function cleanBaseFolder(input: string): string {
@@ -48,6 +49,16 @@ export function cleanOverlapThreshold(input: string | number): number {
 /** Coerce a minimum-overlap-minutes field to a non-negative whole number. */
 export function cleanMinimumOverlapMinutes(input: string | number): number {
 	return cleanInterval(input);
+}
+
+/** Normalize which source transcript to keep for merged meetings. */
+export function cleanTranscriptSourcePreference(
+	input: string,
+): TranscriptSourcePreference {
+	if (input === "all" || input === "macparakeet" || input === "fellow") {
+		return input;
+	}
+	return DEFAULT_SETTINGS.transcriptSourcePreference;
 }
 
 /** A sync-since value is valid when blank (= install date) or a YYYY-MM-DD date. */

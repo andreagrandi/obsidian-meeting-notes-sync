@@ -3,10 +3,18 @@ import type { AiResult, MeetingDetail, MeetingSummary } from "../cli/types";
 import { MacParakeetAdapter } from "../sources/macparakeet";
 import type { SourceAdapter, SourceMeeting } from "../sources/types";
 import { SyncEngine, inScope } from "./engine";
-import { DEFAULT_SETTINGS, type CliClient, type Settings, type SyncStateData, type VaultIO } from "./types";
+import {
+	DEFAULT_SETTINGS,
+	type CliClient,
+	type Settings,
+	type SyncStateData,
+	type VaultIO,
+} from "./types";
 import { emptyState } from "./types";
 
-function summary(overrides: Partial<MeetingSummary> & { id: string }): MeetingSummary {
+function summary(
+	overrides: Partial<MeetingSummary> & { id: string },
+): MeetingSummary {
 	return {
 		shortID: overrides.id.slice(0, 4).toUpperCase(),
 		title: "Weekly Standup",
@@ -20,7 +28,9 @@ function summary(overrides: Partial<MeetingSummary> & { id: string }): MeetingSu
 	};
 }
 
-function detail(overrides: Partial<MeetingDetail> & { id: string }): MeetingDetail {
+function detail(
+	overrides: Partial<MeetingDetail> & { id: string },
+): MeetingDetail {
 	return {
 		shortID: overrides.id.slice(0, 4).toUpperCase(),
 		title: "Weekly Standup",
@@ -68,7 +78,10 @@ class FakeVault implements VaultIO {
 		const prefix = `${fromPath}/`;
 		for (const key of [...this.files.keys()]) {
 			if (key === fromPath || key.startsWith(prefix)) {
-				this.files.set(`${toPath}${key.slice(fromPath.length)}`, this.files.get(key) as string);
+				this.files.set(
+					`${toPath}${key.slice(fromPath.length)}`,
+					this.files.get(key) as string,
+				);
 				this.files.delete(key);
 			}
 		}
@@ -119,7 +132,12 @@ class FakeCli implements CliClient {
 	}
 }
 
-function makeEngine(sources: SourceAdapter[], vault: VaultIO, state: SyncStateData, settings: Settings) {
+function makeEngine(
+	sources: SourceAdapter[],
+	vault: VaultIO,
+	state: SyncStateData,
+	settings: Settings,
+) {
 	return new SyncEngine({
 		sources,
 		vault,
@@ -129,13 +147,23 @@ function makeEngine(sources: SourceAdapter[], vault: VaultIO, state: SyncStateDa
 	});
 }
 
-function makeMacParakeetEngine(cli: CliClient, vault: VaultIO, state: SyncStateData, settings: Settings) {
+function makeMacParakeetEngine(
+	cli: CliClient,
+	vault: VaultIO,
+	state: SyncStateData,
+	settings: Settings,
+) {
 	return makeEngine([new MacParakeetAdapter(cli)], vault, state, settings);
 }
 
 /** Default settings with MacParakeet on and a wide-open sync window so fixtures are in scope. */
 function settings(overrides: Partial<Settings> = {}): Settings {
-	return { ...DEFAULT_SETTINGS, sourceMacparakeetEnabled: true, syncSince: "2000-01-01", ...overrides };
+	return {
+		...DEFAULT_SETTINGS,
+		sourceMacparakeetEnabled: true,
+		syncSince: "2000-01-01",
+		...overrides,
+	};
 }
 
 const FOLDER = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
@@ -151,11 +179,18 @@ describe("SyncEngine — new meeting", () => {
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 
-		const result = await makeMacParakeetEngine(cli, vault, state, settings()).sync();
+		const result = await makeMacParakeetEngine(
+			cli,
+			vault,
+			state,
+			settings(),
+		).sync();
 
 		expect(result).toEqual({ created: 1, updated: 0, unchanged: 0 });
 		expect(vault.folders.has(FOLDER)).toBe(true);
-		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup - Jun 12th.md`)).toBe(true);
+		expect(vault.files.has(`${FOLDER}/1 - Weekly Standup - Jun 12th.md`)).toBe(
+			true,
+		);
 		expect(vault.files.has(`${FOLDER}/Summary (MacParakeet).md`)).toBe(true);
 		expect(state.meetings["m-1"]?.n).toBe(1);
 	});
@@ -191,8 +226,17 @@ describe("SyncEngine — classification matrix", () => {
 		const { cli, vault, engine } = setup();
 		await engine.sync();
 		vault.writeLog.length = 0;
-		cli.meetings = [summary({ id: "m-1", promptResultCount: 1, updatedAt: "2026-06-12T11:00:00Z" })];
-		cli.details["m-1"] = detail({ id: "m-1", updatedAt: "2026-06-12T11:00:00Z" });
+		cli.meetings = [
+			summary({
+				id: "m-1",
+				promptResultCount: 1,
+				updatedAt: "2026-06-12T11:00:00Z",
+			}),
+		];
+		cli.details["m-1"] = detail({
+			id: "m-1",
+			updatedAt: "2026-06-12T11:00:00Z",
+		});
 
 		const result = await engine.sync();
 
@@ -204,19 +248,34 @@ describe("SyncEngine — classification matrix", () => {
 		const { cli, vault, engine } = setup();
 		await engine.sync();
 		vault.writeLog.length = 0;
-		cli.meetings = [summary({ id: "m-1", promptResultCount: 2, updatedAt: "2026-06-12T11:00:00Z" })];
+		cli.meetings = [
+			summary({
+				id: "m-1",
+				promptResultCount: 2,
+				updatedAt: "2026-06-12T11:00:00Z",
+			}),
+		];
 		cli.results["m-1"] = [
 			aiResult({ id: "r-1", name: "Summary" }),
-			aiResult({ id: "r-2", name: "Action Items", createdAt: "2026-06-12T10:09:00Z" }),
+			aiResult({
+				id: "r-2",
+				name: "Action Items",
+				createdAt: "2026-06-12T10:09:00Z",
+			}),
 		];
 
 		const result = await engine.sync();
 
 		expect(result).toEqual({ created: 0, updated: 1, unchanged: 0 });
 		expect(vault.writeLog.sort()).toEqual(
-			[`${FOLDER}/Action Items (MacParakeet).md`, `${FOLDER}/1 - Weekly Standup - Jun 12th.md`].sort(),
+			[
+				`${FOLDER}/Action Items (MacParakeet).md`,
+				`${FOLDER}/1 - Weekly Standup - Jun 12th.md`,
+			].sort(),
 		);
-		expect(vault.files.get(`${FOLDER}/1 - Weekly Standup - Jun 12th.md`)).toContain("[[Action Items (MacParakeet)]]");
+		expect(
+			vault.files.get(`${FOLDER}/1 - Weekly Standup - Jun 12th.md`),
+		).toContain("[[Action Items (MacParakeet)]]");
 	});
 });
 
@@ -224,16 +283,29 @@ describe("SyncEngine — content toggles", () => {
 	it("writes Notes.md and Transcript.md only when their toggles are on and content exists", async () => {
 		const cli = new FakeCli(
 			[summary({ id: "m-1", hasNotes: true })],
-			{ "m-1": detail({ id: "m-1", userNotes: "Remember the demo.", transcript: "Full transcript." }) },
+			{
+				"m-1": detail({
+					id: "m-1",
+					userNotes: "Remember the demo.",
+					transcript: "Full transcript.",
+				}),
+			},
 			{ "m-1": [] },
 		);
 		const vault = new FakeVault();
 
-		await makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings({ syncTranscript: true })).sync();
+		await makeMacParakeetEngine(
+			cli,
+			vault,
+			emptyState("2026-06-01"),
+			settings({ syncTranscript: true }),
+		).sync();
 
 		expect(vault.files.has(`${FOLDER}/Notes.md`)).toBe(true);
 		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(true);
-		expect(vault.files.get(`${FOLDER}/Notes.md`)).toContain("Remember the demo.");
+		expect(vault.files.get(`${FOLDER}/Notes.md`)).toContain(
+			"Remember the demo.",
+		);
 	});
 
 	it("does not write Notes.md when the meeting has no notes", async () => {
@@ -243,7 +315,12 @@ describe("SyncEngine — content toggles", () => {
 			{ "m-1": [] },
 		);
 		const vault = new FakeVault();
-		await makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings()).sync();
+		await makeMacParakeetEngine(
+			cli,
+			vault,
+			emptyState("2026-06-01"),
+			settings(),
+		).sync();
 		expect(vault.files.has(`${FOLDER}/Notes.md`)).toBe(false);
 	});
 
@@ -259,18 +336,26 @@ describe("SyncEngine — content toggles", () => {
 		const engine = makeMacParakeetEngine(cli, vault, state, liveSettings);
 
 		await engine.sync();
-		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(false);
+		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(
+			false,
+		);
 
 		// Toggle transcript on, but the meeting itself has not changed.
 		liveSettings.syncTranscript = true;
 		const result = await engine.sync();
 
 		expect(result).toEqual({ created: 0, updated: 0, unchanged: 1 });
-		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(false);
+		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(
+			false,
+		);
 
 		// Once the meeting changes, the now-enabled transcript is written.
 		cli.meetings = [summary({ id: "m-1", updatedAt: "2026-06-12T12:00:00Z" })];
-		cli.details["m-1"] = detail({ id: "m-1", transcript: "Full transcript.", updatedAt: "2026-06-12T12:00:00Z" });
+		cli.details["m-1"] = detail({
+			id: "m-1",
+			transcript: "Full transcript.",
+			updatedAt: "2026-06-12T12:00:00Z",
+		});
 		await engine.sync();
 		expect(vault.files.has(`${FOLDER}/Transcript (MacParakeet).md`)).toBe(true);
 	});
@@ -286,12 +371,26 @@ describe("SyncEngine — file ownership", () => {
 		const vault = new FakeVault();
 		const foreign = `${FOLDER}/My thoughts.md`;
 		vault.files.set(foreign, "my private notes");
-		const engine = makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings());
+		const engine = makeMacParakeetEngine(
+			cli,
+			vault,
+			emptyState("2026-06-01"),
+			settings(),
+		);
 
 		await engine.sync();
 		// A bumped meeting triggers a re-render; the foreign file is still untouched.
-		cli.meetings = [summary({ id: "m-1", promptResultCount: 1, updatedAt: "2026-06-12T13:00:00Z" })];
-		cli.details["m-1"] = detail({ id: "m-1", updatedAt: "2026-06-12T13:00:00Z" });
+		cli.meetings = [
+			summary({
+				id: "m-1",
+				promptResultCount: 1,
+				updatedAt: "2026-06-12T13:00:00Z",
+			}),
+		];
+		cli.details["m-1"] = detail({
+			id: "m-1",
+			updatedAt: "2026-06-12T13:00:00Z",
+		});
 		await engine.sync({ force: true });
 
 		expect(vault.writeLog).not.toContain(foreign);
@@ -307,7 +406,12 @@ describe("SyncEngine — force re-sync", () => {
 			{ "m-1": [aiResult({ id: "r-1", content: "original" })] },
 		);
 		const vault = new FakeVault();
-		const engine = makeMacParakeetEngine(cli, vault, emptyState("2026-06-01"), settings());
+		const engine = makeMacParakeetEngine(
+			cli,
+			vault,
+			emptyState("2026-06-01"),
+			settings(),
+		);
 
 		await engine.sync();
 		// Result content changes but updatedAt and count stay the same.
@@ -315,11 +419,15 @@ describe("SyncEngine — force re-sync", () => {
 
 		const normal = await engine.sync();
 		expect(normal).toEqual({ created: 0, updated: 0, unchanged: 1 });
-		expect(vault.files.get(`${FOLDER}/Summary (MacParakeet).md`)).toContain("original");
+		expect(vault.files.get(`${FOLDER}/Summary (MacParakeet).md`)).toContain(
+			"original",
+		);
 
 		const forced = await engine.sync({ force: true });
 		expect(forced).toEqual({ created: 0, updated: 1, unchanged: 0 });
-		expect(vault.files.get(`${FOLDER}/Summary (MacParakeet).md`)).toContain("regenerated");
+		expect(vault.files.get(`${FOLDER}/Summary (MacParakeet).md`)).toContain(
+			"regenerated",
+		);
 	});
 });
 
@@ -329,7 +437,11 @@ describe("SyncEngine — sync scope and numbering", () => {
 			[
 				summary({ id: "old", createdAt: "2026-05-01T10:00:00Z" }),
 				summary({ id: "recent", createdAt: "2026-06-10T10:00:00Z" }),
-				summary({ id: "recording", createdAt: "2026-06-11T10:00:00Z", status: "recording" }),
+				summary({
+					id: "recording",
+					createdAt: "2026-06-11T10:00:00Z",
+					status: "recording",
+				}),
 			],
 			{
 				old: detail({ id: "old", createdAt: "2026-05-01T10:00:00Z" }),
@@ -340,7 +452,12 @@ describe("SyncEngine — sync scope and numbering", () => {
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 
-		const result = await makeMacParakeetEngine(cli, vault, state, settings({ syncSince: "2026-06-01" })).sync();
+		const result = await makeMacParakeetEngine(
+			cli,
+			vault,
+			state,
+			settings({ syncSince: "2026-06-01" }),
+		).sync();
 
 		expect(result.created).toBe(1);
 		expect(Object.keys(state.meetings)).toEqual(["recent"]);
@@ -350,11 +467,23 @@ describe("SyncEngine — sync scope and numbering", () => {
 		const cli = new FakeCli(
 			[
 				summary({ id: "b", createdAt: "2026-06-20T10:00:00Z", title: "Later" }),
-				summary({ id: "a", createdAt: "2026-06-05T10:00:00Z", title: "Earlier" }),
+				summary({
+					id: "a",
+					createdAt: "2026-06-05T10:00:00Z",
+					title: "Earlier",
+				}),
 			],
 			{
-				a: detail({ id: "a", createdAt: "2026-06-05T10:00:00Z", title: "Earlier" }),
-				b: detail({ id: "b", createdAt: "2026-06-20T10:00:00Z", title: "Later" }),
+				a: detail({
+					id: "a",
+					createdAt: "2026-06-05T10:00:00Z",
+					title: "Earlier",
+				}),
+				b: detail({
+					id: "b",
+					createdAt: "2026-06-20T10:00:00Z",
+					title: "Later",
+				}),
 			},
 			{},
 		);
@@ -385,12 +514,25 @@ describe("SyncEngine — v1 upgrade", () => {
 			n: 1,
 			bucket: "2026/06",
 			sources: {
-				macparakeet: { id: "m-1", snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 } },
+				macparakeet: {
+					id: "m-1",
+					snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 },
+				},
 			},
-			files: { index: { path: `${LEGACY_FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" } },
+			files: {
+				index: {
+					path: `${LEGACY_FOLDER}/1 - Weekly Standup.md`,
+					sourceUpdatedAt: "2026-06-12T10:30:00Z",
+				},
+			},
 		};
 
-		const result = await makeMacParakeetEngine(cli, vault, state, settings()).sync();
+		const result = await makeMacParakeetEngine(
+			cli,
+			vault,
+			state,
+			settings(),
+		).sync();
 
 		expect(result).toEqual({ created: 0, updated: 0, unchanged: 1 });
 		expect(vault.writeLog).toHaveLength(0);
@@ -430,12 +572,22 @@ describe("SyncEngine — v1 upgrade", () => {
 
 	it("re-renders a changed legacy meeting without renaming its tracked v1 files", async () => {
 		const cli = new FakeCli(
-			[summary({ id: "m-1", promptResultCount: 2, updatedAt: "2026-06-12T12:00:00Z" })],
+			[
+				summary({
+					id: "m-1",
+					promptResultCount: 2,
+					updatedAt: "2026-06-12T12:00:00Z",
+				}),
+			],
 			{ "m-1": detail({ id: "m-1", updatedAt: "2026-06-12T12:00:00Z" }) },
 			{
 				"m-1": [
 					aiResult({ id: "r-1", name: "Summary" }),
-					aiResult({ id: "r-2", name: "Action Items", createdAt: "2026-06-12T10:09:00Z" }),
+					aiResult({
+						id: "r-2",
+						name: "Action Items",
+						createdAt: "2026-06-12T10:09:00Z",
+					}),
 				],
 			},
 		);
@@ -446,13 +598,25 @@ describe("SyncEngine — v1 upgrade", () => {
 			folderPath: LEGACY_FOLDER,
 			n: 1,
 			bucket: "2026/06",
-			interval: { start: "2026-06-12T10:00:00.000Z", end: "2026-06-12T10:47:00.000Z" },
+			interval: {
+				start: "2026-06-12T10:00:00.000Z",
+				end: "2026-06-12T10:47:00.000Z",
+			},
 			sources: {
-				macparakeet: { id: "m-1", snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 } },
+				macparakeet: {
+					id: "m-1",
+					snapshot: { updatedAt: "2026-06-12T10:30:00Z", promptResultCount: 1 },
+				},
 			},
 			files: {
-				index: { path: `${LEGACY_FOLDER}/1 - Weekly Standup.md`, sourceUpdatedAt: "2026-06-12T10:30:00Z" },
-				"result:r-1": { path: `${LEGACY_FOLDER}/Summary.md`, sourceUpdatedAt: "2026-06-12T10:05:00Z" },
+				index: {
+					path: `${LEGACY_FOLDER}/1 - Weekly Standup.md`,
+					sourceUpdatedAt: "2026-06-12T10:30:00Z",
+				},
+				"result:r-1": {
+					path: `${LEGACY_FOLDER}/Summary.md`,
+					sourceUpdatedAt: "2026-06-12T10:05:00Z",
+				},
 			},
 		};
 
@@ -460,14 +624,22 @@ describe("SyncEngine — v1 upgrade", () => {
 
 		// The unchanged legacy result keeps its v1 name and is not rewritten or renamed;
 		// only the newly appeared result gets the v2 source suffix.
-		expect(state.meetings["m-1"]?.files["result:r-1"]?.path).toBe(`${LEGACY_FOLDER}/Summary.md`);
-		expect(vault.writeLog).not.toContain(`${LEGACY_FOLDER}/Summary (MacParakeet).md`);
-		expect(vault.files.has(`${LEGACY_FOLDER}/Action Items (MacParakeet).md`)).toBe(true);
+		expect(state.meetings["m-1"]?.files["result:r-1"]?.path).toBe(
+			`${LEGACY_FOLDER}/Summary.md`,
+		);
+		expect(vault.writeLog).not.toContain(
+			`${LEGACY_FOLDER}/Summary (MacParakeet).md`,
+		);
+		expect(
+			vault.files.has(`${LEGACY_FOLDER}/Action Items (MacParakeet).md`),
+		).toBe(true);
 	});
 });
 
 describe("SyncEngine — cross-source identity resolution", () => {
-	function sourceMeeting(overrides: Partial<SourceMeeting> & { id: string }): SourceMeeting {
+	function sourceMeeting(
+		overrides: Partial<SourceMeeting> & { id: string },
+	): SourceMeeting {
 		return {
 			title: "Weekly Standup",
 			status: "completed",
@@ -517,9 +689,17 @@ describe("SyncEngine — cross-source identity resolution", () => {
 
 	it("merges a Fellow recap into an existing MacParakeet folder by interval overlap", async () => {
 		const macparakeet = new FakeSource("macparakeet");
-		macparakeet.meetings = [sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 })];
+		macparakeet.meetings = [
+			sourceMeeting({
+				id: "mp-1",
+				title: "Weekly Standup",
+				promptResultCount: 1,
+			}),
+		];
 		macparakeet.details = { "mp-1": detail({ id: "mp-1" }) };
-		macparakeet.results = { "mp-1": [aiResult({ id: "r-1", name: "Summary" })] };
+		macparakeet.results = {
+			"mp-1": [aiResult({ id: "r-1", name: "Summary" })],
+		};
 
 		const fellow = new FakeSource("fellow");
 		fellow.meetings = [
@@ -531,7 +711,9 @@ describe("SyncEngine — cross-source identity resolution", () => {
 				updatedAt: "2026-06-12T14:00:00Z",
 			}),
 		];
-		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Weekly Standup" }) };
+		fellow.details = {
+			"fl-1": detail({ id: "fl-1", title: "Weekly Standup" }),
+		};
 		fellow.results = { "fl-1": [aiResult({ id: "fr-1", name: "Summary" })] };
 
 		const vault = new FakeVault();
@@ -550,9 +732,19 @@ describe("SyncEngine — cross-source identity resolution", () => {
 
 	it("writes both sources' artifacts into one folder with a combined index (PLAN §12.4)", async () => {
 		const macparakeet = new FakeSource("macparakeet");
-		macparakeet.meetings = [sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 })];
-		macparakeet.details = { "mp-1": detail({ id: "mp-1", transcript: "mp transcript" }) };
-		macparakeet.results = { "mp-1": [aiResult({ id: "r-1", name: "Summary" })] };
+		macparakeet.meetings = [
+			sourceMeeting({
+				id: "mp-1",
+				title: "Weekly Standup",
+				promptResultCount: 1,
+			}),
+		];
+		macparakeet.details = {
+			"mp-1": detail({ id: "mp-1", transcript: "mp transcript" }),
+		};
+		macparakeet.results = {
+			"mp-1": [aiResult({ id: "r-1", name: "Summary" })],
+		};
 
 		const fellow = new FakeSource("fellow");
 		fellow.meetings = [
@@ -564,13 +756,24 @@ describe("SyncEngine — cross-source identity resolution", () => {
 				updatedAt: "2026-06-12T14:00:00Z",
 			}),
 		];
-		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Weekly Standup", transcript: "fl transcript" }) };
+		fellow.details = {
+			"fl-1": detail({
+				id: "fl-1",
+				title: "Weekly Standup",
+				transcript: "fl transcript",
+			}),
+		};
 		fellow.results = { "fl-1": [aiResult({ id: "fr-1", name: "Summary" })] };
 
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
 
-		await makeEngine([macparakeet, fellow], vault, state, settings({ syncTranscript: true })).sync();
+		await makeEngine(
+			[macparakeet, fellow],
+			vault,
+			state,
+			settings({ syncTranscript: true }),
+		).sync();
 
 		const folder = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
 		// Both sources' artifacts live in the one frozen folder, attributed by suffix.
@@ -581,12 +784,172 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		// No renumber: still one record, no second folder.
 		expect(Object.keys(state.meetings)).toHaveLength(1);
 
-		const index = vault.files.get(`${folder}/1 - Weekly Standup - Jun 12th.md`) ?? "";
+		const index =
+			vault.files.get(`${folder}/1 - Weekly Standup - Jun 12th.md`) ?? "";
 		expect(index).toContain("macparakeet-id: mp-1");
 		expect(index).toContain("fellow-id: fl-1");
 		expect(index).toContain("## MacParakeet");
 		expect(index).toContain("## Fellow");
 		expect(index).toContain("[[Summary (Fellow)]]");
+	});
+
+	it("skips non-preferred transcripts when the preferred transcript already exists", async () => {
+		const macparakeet = new FakeSource("macparakeet");
+		macparakeet.meetings = [
+			sourceMeeting({
+				id: "mp-1",
+				title: "Weekly Standup",
+				promptResultCount: 1,
+			}),
+		];
+		macparakeet.details = {
+			"mp-1": detail({ id: "mp-1", transcript: "mp transcript" }),
+		};
+
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Weekly Standup",
+				createdAt: "2026-06-12T10:02:00Z",
+				durationMs: 2700000,
+				updatedAt: "2026-06-12T14:00:00Z",
+			}),
+		];
+		fellow.details = {
+			"fl-1": detail({
+				id: "fl-1",
+				title: "Weekly Standup",
+				transcript: "fl transcript",
+			}),
+		};
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+
+		await makeEngine(
+			[macparakeet, fellow],
+			vault,
+			state,
+			settings({
+				syncTranscript: true,
+				transcriptSourcePreference: "macparakeet",
+			}),
+		).sync();
+
+		const folder = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
+		expect(vault.files.has(`${folder}/Transcript (MacParakeet).md`)).toBe(true);
+		expect(vault.files.has(`${folder}/Transcript (Fellow).md`)).toBe(false);
+		const record = Object.values(state.meetings)[0];
+		expect(record?.files.transcript?.source).toBe("macparakeet");
+		expect(record?.files["transcript:fellow"]).toBeUndefined();
+	});
+
+	it("trashes a previously written transcript when the preferred source arrives", async () => {
+		const macparakeet = new FakeSource("macparakeet");
+		macparakeet.meetings = [
+			sourceMeeting({
+				id: "mp-1",
+				title: "Weekly Standup",
+				promptResultCount: 1,
+			}),
+		];
+		macparakeet.details = {
+			"mp-1": detail({ id: "mp-1", transcript: "mp transcript" }),
+		};
+
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Weekly Standup",
+				createdAt: "2026-06-12T10:02:00Z",
+				durationMs: 2700000,
+				updatedAt: "2026-06-12T14:00:00Z",
+			}),
+		];
+		fellow.details = {
+			"fl-1": detail({
+				id: "fl-1",
+				title: "Weekly Standup",
+				transcript: "fl transcript",
+			}),
+		};
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+
+		await makeEngine(
+			[macparakeet, fellow],
+			vault,
+			state,
+			settings({ syncTranscript: true, transcriptSourcePreference: "fellow" }),
+		).sync();
+
+		const folder = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
+		expect(vault.files.has(`${folder}/Transcript (MacParakeet).md`)).toBe(
+			false,
+		);
+		expect(vault.files.has(`${folder}/Transcript (Fellow).md`)).toBe(true);
+		const record = Object.values(state.meetings)[0];
+		expect(record?.files.transcript).toBeUndefined();
+		expect(record?.files["transcript:fellow"]?.source).toBe("fellow");
+		const index =
+			vault.files.get(`${folder}/1 - Weekly Standup - Jun 12th.md`) ?? "";
+		expect(index).not.toContain("[[Transcript (MacParakeet)]]");
+		expect(index).toContain("[[Transcript (Fellow)]]");
+	});
+
+	it("keeps an available fallback transcript when the preferred source has none", async () => {
+		const fellow = new FakeSource("fellow");
+		fellow.meetings = [
+			sourceMeeting({
+				id: "fl-1",
+				title: "Weekly Standup",
+				createdAt: "2026-06-12T10:02:00Z",
+				durationMs: 2700000,
+				updatedAt: "2026-06-12T14:00:00Z",
+			}),
+		];
+		fellow.details = {
+			"fl-1": detail({
+				id: "fl-1",
+				title: "Weekly Standup",
+				transcript: "fl transcript",
+			}),
+		};
+
+		const macparakeet = new FakeSource("macparakeet");
+		macparakeet.meetings = [
+			sourceMeeting({
+				id: "mp-1",
+				title: "Weekly Standup",
+				promptResultCount: 1,
+			}),
+		];
+		macparakeet.details = { "mp-1": detail({ id: "mp-1", transcript: "   " }) };
+
+		const vault = new FakeVault();
+		const state = emptyState("2026-06-01");
+
+		await makeEngine(
+			[fellow, macparakeet],
+			vault,
+			state,
+			settings({
+				syncTranscript: true,
+				transcriptSourcePreference: "macparakeet",
+			}),
+		).sync();
+
+		const folder = "Meetings/2026/06 - June/1 - Weekly Standup - Jun 12th";
+		expect(vault.files.has(`${folder}/Transcript (Fellow).md`)).toBe(true);
+		expect(vault.files.has(`${folder}/Transcript (MacParakeet).md`)).toBe(
+			false,
+		);
+		const record = Object.values(state.meetings)[0];
+		expect(record?.files["transcript:fellow"]?.source).toBe("fellow");
+		expect(record?.files.transcript).toBeUndefined();
 	});
 
 	it("merges identically when Fellow syncs first and MacParakeet arrives later", async () => {
@@ -601,7 +964,9 @@ describe("SyncEngine — cross-source identity resolution", () => {
 				updatedAt: "2026-06-12T14:00:00Z",
 			}),
 		];
-		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Weekly Standup" }) };
+		fellow.details = {
+			"fl-1": detail({ id: "fl-1", title: "Weekly Standup" }),
+		};
 		fellow.results = { "fl-1": [aiResult({ id: "fr-1", name: "Summary" })] };
 
 		const vault = new FakeVault();
@@ -615,9 +980,17 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		expect(vault.files.has(`${folder}/Summary (Fellow).md`)).toBe(true);
 
 		// Sync 2: MacParakeet now reports the same meeting (overlapping interval).
-		macparakeet.meetings = [sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 })];
+		macparakeet.meetings = [
+			sourceMeeting({
+				id: "mp-1",
+				title: "Weekly Standup",
+				promptResultCount: 1,
+			}),
+		];
 		macparakeet.details = { "mp-1": detail({ id: "mp-1" }) };
-		macparakeet.results = { "mp-1": [aiResult({ id: "r-1", name: "Summary" })] };
+		macparakeet.results = {
+			"mp-1": [aiResult({ id: "r-1", name: "Summary" })],
+		};
 
 		await engine.sync();
 
@@ -628,7 +1001,8 @@ describe("SyncEngine — cross-source identity resolution", () => {
 		expect(record.sources.fellow?.id).toBe("fl-1");
 		expect(vault.files.has(`${folder}/Summary (MacParakeet).md`)).toBe(true);
 		expect(vault.files.has(`${folder}/Summary (Fellow).md`)).toBe(true);
-		const index = vault.files.get(`${folder}/1 - Weekly Standup - Jun 12th.md`) ?? "";
+		const index =
+			vault.files.get(`${folder}/1 - Weekly Standup - Jun 12th.md`) ?? "";
 		expect(index).toContain("macparakeet-id: mp-1");
 		expect(index).toContain("fellow-id: fl-1");
 	});
@@ -636,9 +1010,16 @@ describe("SyncEngine — cross-source identity resolution", () => {
 	it("merges back-to-back same-day same-title recordings across sources", async () => {
 		const macparakeet = new FakeSource("macparakeet");
 		macparakeet.meetings = [
-			sourceMeeting({ id: "mp-1", title: "Standup", createdAt: "2026-06-12T10:00:00Z", durationMs: 900_000 }),
+			sourceMeeting({
+				id: "mp-1",
+				title: "Standup",
+				createdAt: "2026-06-12T10:00:00Z",
+				durationMs: 900_000,
+			}),
 		];
-		macparakeet.details = { "mp-1": detail({ id: "mp-1", title: "Standup", durationMs: 900_000 }) };
+		macparakeet.details = {
+			"mp-1": detail({ id: "mp-1", title: "Standup", durationMs: 900_000 }),
+		};
 
 		const fellow = new FakeSource("fellow");
 		fellow.meetings = [
@@ -649,7 +1030,9 @@ describe("SyncEngine — cross-source identity resolution", () => {
 				durationMs: 900_000,
 			}),
 		];
-		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Standup", durationMs: 900_000 }) };
+		fellow.details = {
+			"fl-1": detail({ id: "fl-1", title: "Standup", durationMs: 900_000 }),
+		};
 
 		const vault = new FakeVault();
 		const state = emptyState("2026-06-01");
@@ -667,9 +1050,15 @@ describe("SyncEngine — cross-source identity resolution", () => {
 	it("marks a merge low-confidence when titles differ strongly", async () => {
 		const macparakeet = new FakeSource("macparakeet");
 		macparakeet.meetings = [
-			sourceMeeting({ id: "mp-1", title: "Weekly Standup", promptResultCount: 1 }),
+			sourceMeeting({
+				id: "mp-1",
+				title: "Weekly Standup",
+				promptResultCount: 1,
+			}),
 		];
-		macparakeet.details = { "mp-1": detail({ id: "mp-1", title: "Weekly Standup" }) };
+		macparakeet.details = {
+			"mp-1": detail({ id: "mp-1", title: "Weekly Standup" }),
+		};
 		macparakeet.results = { "mp-1": [aiResult({ id: "r-1" })] };
 
 		const fellow = new FakeSource("fellow");
@@ -682,7 +1071,9 @@ describe("SyncEngine — cross-source identity resolution", () => {
 				updatedAt: "2026-06-12T14:00:00Z",
 			}),
 		];
-		fellow.details = { "fl-1": detail({ id: "fl-1", title: "Q3 Roadmap Review" }) };
+		fellow.details = {
+			"fl-1": detail({ id: "fl-1", title: "Q3 Roadmap Review" }),
+		};
 		fellow.results = { "fl-1": [aiResult({ id: "fr-1" })] };
 
 		const vault = new FakeVault();
@@ -701,9 +1092,16 @@ describe("inScope", () => {
 			summary({ id: "new", createdAt: "2026-06-12T00:00:00Z" }),
 			summary({ id: "old", createdAt: "2026-06-01T00:00:00Z" }),
 			summary({ id: "before", createdAt: "2026-05-01T00:00:00Z" }),
-			summary({ id: "recording", createdAt: "2026-06-20T00:00:00Z", status: "recording" }),
+			summary({
+				id: "recording",
+				createdAt: "2026-06-20T00:00:00Z",
+				status: "recording",
+			}),
 		];
-		expect(inScope(meetings, "2026-06-01").map((m) => m.id)).toEqual(["old", "new"]);
+		expect(inScope(meetings, "2026-06-01").map((m) => m.id)).toEqual([
+			"old",
+			"new",
+		]);
 	});
 
 	it("compares against the calendar date, not the raw timestamp", () => {
@@ -711,6 +1109,8 @@ describe("inScope", () => {
 			summary({ id: "same-day-early", createdAt: "2026-06-01T02:00:00Z" }),
 			summary({ id: "day-before-late", createdAt: "2026-05-31T23:30:00Z" }),
 		];
-		expect(inScope(meetings, "2026-06-01").map((m) => m.id)).toEqual(["same-day-early"]);
+		expect(inScope(meetings, "2026-06-01").map((m) => m.id)).toEqual([
+			"same-day-early",
+		]);
 	});
 });

@@ -9,7 +9,14 @@
 
 import { joinPath, renderTemplate } from "./paths";
 import { renderIndex } from "./renderer";
-import type { Interval, MeetingRecord, Settings, SyncStateData, VaultIO } from "./types";
+import { applyTranscriptPreference } from "./transcripts";
+import type {
+	Interval,
+	MeetingRecord,
+	Settings,
+	SyncStateData,
+	VaultIO,
+} from "./types";
 
 /** The sources a record can bind, in stable order. */
 const SOURCE_NAMES = ["macparakeet", "fellow"] as const;
@@ -46,7 +53,9 @@ export interface MergeResult {
  * Merge `keyB` into `keyA` (or vice-versa): the lower-numbered record survives,
  * the other is absorbed and trashed. Mutates `state`; the caller persists.
  */
-export async function mergeMeetings(deps: MergeMeetingsDeps): Promise<MergeResult> {
+export async function mergeMeetings(
+	deps: MergeMeetingsDeps,
+): Promise<MergeResult> {
 	const { state, settings, vault, keyA, keyB, title } = deps;
 
 	if (keyA === keyB) {
@@ -73,7 +82,9 @@ export async function mergeMeetings(deps: MergeMeetingsDeps): Promise<MergeResul
 
 	const createdAt = survivor.interval?.start ?? absorbed.interval?.start;
 	if (!createdAt) {
-		throw new MergeError("The surviving meeting has no date on record; cannot rebuild its folder.");
+		throw new MergeError(
+			"The surviving meeting has no date on record; cannot rebuild its folder.",
+		);
 	}
 
 	// 1. Rename the survivor's folder if the chosen title changes its leaf name.
@@ -104,7 +115,10 @@ export async function mergeMeetings(deps: MergeMeetingsDeps): Promise<MergeResul
 	await vault.trash(absorbed.folderPath);
 	delete state.meetings[absorbedKey];
 
-	// 5. Re-render the combined index so it links both sources' artifacts.
+	// 5. Apply the merged-meeting transcript preference before linking artifacts.
+	await applyTranscriptPreference({ settings, record: survivor, vault });
+
+	// 6. Re-render the combined index so it links both sources' artifacts.
 	const index = renderIndex({
 		folderPath: newFolder,
 		title: survivor.title,
@@ -114,10 +128,19 @@ export async function mergeMeetings(deps: MergeMeetingsDeps): Promise<MergeResul
 		mergeConfidence: survivor.mergeConfidence,
 	});
 	await vault.write(index.path, index.content);
-	survivor.files.index = { path: index.path, sourceUpdatedAt: index.sourceUpdatedAt };
+	survivor.files.index = {
+		path: index.path,
+		sourceUpdatedAt: index.sourceUpdatedAt,
+	};
 
-	// 6. Renumber the tail so the freed number is reclaimed.
-	const renumbered = await renumberAfterMerge(state, settings, vault, survivor.bucket, freed);
+	// 7. Renumber the tail so the freed number is reclaimed.
+	const renumbered = await renumberAfterMerge(
+		state,
+		settings,
+		vault,
+		survivor.bucket,
+		freed,
+	);
 
 	return { recordKey: survivorKey, folderPath: newFolder, renumbered };
 }
@@ -140,7 +163,11 @@ async function renumberAfterMerge(
 
 	for (const record of affected) {
 		record.n -= 1;
-		await relocateRecordFolder(vault, record, renumberedFolder(settings, record));
+		await relocateRecordFolder(
+			vault,
+			record,
+			renumberedFolder(settings, record),
+		);
 	}
 
 	// Reset the counter to the next free number for the (now contiguous) bucket.
@@ -157,11 +184,18 @@ function renumberedFolder(settings: Settings, record: MeetingRecord): string {
 	const createdAt = record.interval?.start;
 	if (!createdAt) {
 		// No date to re-render the template; rewrite just the leading "<n> -" of the leaf.
-		return record.folderPath.replace(/(^|\/)(\d+)( - )/, (_match, sep: string, _n, sep2: string) => `${sep}${record.n}${sep2}`);
+		return record.folderPath.replace(
+			/(^|\/)(\d+)( - )/,
+			(_match, sep: string, _n, sep2: string) => `${sep}${record.n}${sep2}`,
+		);
 	}
 	return joinPath(
 		settings.baseFolder,
-		renderTemplate(settings.pathTemplate, { createdAt, title: record.title ?? "" }, record.n),
+		renderTemplate(
+			settings.pathTemplate,
+			{ createdAt, title: record.title ?? "" },
+			record.n,
+		),
 	);
 }
 
@@ -169,7 +203,11 @@ function renumberedFolder(settings: Settings, record: MeetingRecord): string {
  * Move a record's folder to `newFolder`, reparenting all tracked file paths and
  * renaming the folder-note so its filename keeps mirroring the folder name.
  */
-async function relocateRecordFolder(vault: VaultIO, record: MeetingRecord, newFolder: string): Promise<void> {
+async function relocateRecordFolder(
+	vault: VaultIO,
+	record: MeetingRecord,
+	newFolder: string,
+): Promise<void> {
 	const oldFolder = record.folderPath;
 	if (oldFolder === newFolder) {
 		return;
@@ -192,7 +230,9 @@ async function relocateRecordFolder(vault: VaultIO, record: MeetingRecord, newFo
 
 /** True when both records bind the same source (cannot be merged). */
 function sourcesOverlap(a: MeetingRecord, b: MeetingRecord): boolean {
-	return SOURCE_NAMES.some((name) => a.sources[name] !== undefined && b.sources[name] !== undefined);
+	return SOURCE_NAMES.some(
+		(name) => a.sources[name] !== undefined && b.sources[name] !== undefined,
+	);
 }
 
 /** Smallest interval covering both; either side may be missing. */
